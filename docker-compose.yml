@@ -1,0 +1,84 @@
+services:
+  # ========================================================
+  # 1. PostgreSQL Database Service
+  # ========================================================
+  db:
+    image: postgres:16-alpine
+    container_name: octane_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-octane_systems}
+      POSTGRES_USER: ${POSTGRES_USER:-octane_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-OctaneSecurePass2026!}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-octane_user} -d ${POSTGRES_DB:-octane_systems}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - octane_network
+
+  # ========================================================
+  # 2. Django + Gunicorn Backend Service
+  # ========================================================
+  backend:
+    build:
+      context: ./octane_backend
+      dockerfile: Dockerfile
+    container_name: octane_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      USE_POSTGRES: "true"
+      POSTGRES_DB: ${POSTGRES_DB:-octane_systems}
+      POSTGRES_USER: ${POSTGRES_USER:-octane_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-OctaneSecurePass2026!}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      SECRET_KEY: ${SECRET_KEY:-octane-production-secret-key-change-this-in-production}
+      DEBUG: ${DEBUG:-False}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-*}
+      CORS_ALLOW_ALL_ORIGINS: "true"
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-http://localhost,http://127.0.0.1}
+    volumes:
+      - backend_staticfiles:/app/staticfiles
+      - backend_media:/app/media
+    expose:
+      - "8000"
+    networks:
+      - octane_network
+
+  # ========================================================
+  # 3. React SPA + Nginx Reverse Proxy Service
+  # ========================================================
+  frontend:
+    build:
+      context: ./octane_frontend
+      dockerfile: Dockerfile
+    container_name: octane_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${PORT:-80}:80"
+    networks:
+      - octane_network
+
+# ========================================================
+# Persistent Volumes (Preserves data across container restarts)
+# ========================================================
+volumes:
+  postgres_data:
+    name: octane_postgres_data
+  backend_staticfiles:
+    name: octane_backend_staticfiles
+  backend_media:
+    name: octane_backend_media
+
+networks:
+  octane_network:
+    driver: bridge
