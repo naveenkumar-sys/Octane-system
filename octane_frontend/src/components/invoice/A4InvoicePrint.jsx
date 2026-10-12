@@ -131,7 +131,9 @@ const A4SinglePageCopy = ({ copyType, invoice, company }) => {
         };
       }
       const qty = parseFloat(item.quantity || item.qty || 1);
-      const rate = parseFloat(item.unit_price || item.unit_cost || item.rate || 0);
+      const rate = isPurchase
+        ? parseFloat(item.unit_cost || item.rate || item.unit_price || 0)
+        : parseFloat(item.rate ?? item.unit_price ?? item.selling_price ?? item.unit_cost ?? 0);
       const disc = parseFloat(item.discount_percent || item.discount || 0);
       const lineTaxable = parseFloat(item.taxable_value ?? (qty * rate * (1 - disc / 100)));
       const gstRate = parseFloat(item.gst_rate !== undefined && item.gst_rate !== null ? item.gst_rate : (invoice.gst_rate ?? 18));
@@ -147,7 +149,7 @@ const A4SinglePageCopy = ({ copyType, invoice, company }) => {
       map[code].total_tax += invoice.is_interstate ? igstAmt : (cgstAmt + sgstAmt);
     });
     return Object.values(map);
-  }, [items, invoice]);
+  }, [items, invoice, isPurchase]);
 
   // Total tax calculation
   const totalTaxable = hsnSummary.reduce((sum, h) => sum + h.taxable_value, 0);
@@ -167,15 +169,11 @@ const A4SinglePageCopy = ({ copyType, invoice, company }) => {
     <div className="w-[210mm] max-w-full h-[297mm] max-h-[297mm] print:w-[210mm] print:max-w-[210mm] print:h-[295mm] print:max-h-[295mm] box-border p-[7mm] print:p-[5mm] flex flex-col justify-between overflow-hidden bg-white text-black font-sans text-[10.5px] leading-tight select-none shadow-2xl print:shadow-none print:border-none mx-auto page-break-inside-avoid">
       {/* 1. Header Title & Copy Type */}
       <div className="flex items-center justify-between pb-1 flex-shrink-0">
-        <div className="w-1/3 flex items-center gap-2">
-          {company.logo && (
-            <img src={company.logo} alt="Company Logo" className="h-8 max-w-[100px] object-contain" />
-          )}
-        </div>
-        <h1 className="text-base font-extrabold text-center uppercase tracking-wide w-1/3 text-slate-950">
+        <div className="w-1/4"></div>
+        <h1 className="text-base font-extrabold text-center uppercase tracking-wide w-2/4 text-slate-950">
           {documentTitle}
         </h1>
-        <div className="text-[10px] font-bold text-right italic uppercase w-1/3 text-slate-800">
+        <div className="text-[10px] font-bold text-right italic uppercase w-1/4 text-slate-800">
           ({copyType})
         </div>
       </div>
@@ -190,13 +188,18 @@ const A4SinglePageCopy = ({ copyType, invoice, company }) => {
             {!isPurchase ? (
               // Sales: Seller = Company
               <div className="p-2 space-y-0.5">
-                <div className="font-extrabold text-[12px] uppercase">{company.name}</div>
+                {company.logo && (
+                  <div className="pb-1">
+                    <img src={company.logo} alt="Company Logo" className="h-8 max-w-[120px] object-contain" />
+                  </div>
+                )}
+                <div className="font-extrabold text-[12px] uppercase leading-tight">{company.name}</div>
                 <div className="text-[10.5px] leading-snug font-medium">{company.address_line1}</div>
                 {company.address_line2 && <div className="text-[10.5px] font-medium">{company.address_line2}</div>}
                 <div className="text-[10.5px] font-medium">{company.city_pincode}</div>
                 {company.phone && <div className="text-[10.5px] font-medium">Ph: {company.phone}</div>}
                 {company.email && <div className="text-[10.5px] font-medium">Email: {company.email}</div>}
-                <div className="text-[10.5px] font-bold">GSTIN/UIN: {company.gstin}</div>
+                <div className="text-[10.5px] font-bold pt-0.5">GSTIN/UIN: {company.gstin}</div>
                 <div className="text-[10.5px] font-bold">State Name: {company.state_name}, Code: {company.state_code}</div>
               </div>
             ) : (
@@ -206,7 +209,7 @@ const A4SinglePageCopy = ({ copyType, invoice, company }) => {
                 <div className="font-extrabold text-[12px] uppercase">{invoice.supplier_name || 'Vendor Supplier'}</div>
                 <div className="text-[10.5px] leading-snug font-medium">{invoice.supplier_address || 'Vendor Address'}</div>
                 {invoice.supplier_mobile && <div className="text-[10.5px] font-medium">Ph: {invoice.supplier_mobile}</div>}
-                <div className="text-[10.5px] font-bold">GSTIN/UIN: {invoice.supplier_gstin || '—'}</div>
+                <div className="text-[10.5px] font-bold pt-0.5">GSTIN/UIN: {invoice.supplier_gstin || '—'}</div>
                 <div className="text-[10.5px] font-bold">State Name: {invoice.supplier_state || 'Karnataka'}, Code: {invoice.supplier_state_code || '29'}</div>
               </div>
             )}
@@ -219,16 +222,21 @@ const A4SinglePageCopy = ({ copyType, invoice, company }) => {
                 <div className="font-extrabold text-[11.5px] uppercase">{invoice.customer_name || invoice.buyer_name || 'Cash Customer'}</div>
                 <div className="text-[10.5px] leading-snug">{invoice.customer_address || invoice.buyer_address || 'Local Customer'}</div>
                 {invoice.customer_mobile && <div className="text-[10.5px] font-medium">Ph: {invoice.customer_mobile}</div>}
-                <div className="text-[10.5px] font-bold">GSTIN/UIN: {invoice.customer_gstin || invoice.buyer_gstin || '—'}</div>
+                <div className="text-[10.5px] font-bold pt-0.5">GSTIN/UIN: {invoice.customer_gstin || invoice.buyer_gstin || '—'}</div>
                 <div className="text-[10.5px] font-bold">State Name: {invoice.customer_state || 'Karnataka'}, Code: {invoice.customer_state_code || '29'}</div>
               </div>
             ) : (
               // Purchase: Buyer = Company (Store / Recipient)
               <div className="border-t border-black p-2 space-y-0.5 bg-slate-50/20">
                 <div className="text-[10px] font-semibold text-slate-700">Recipient / Buyer (Store)</div>
+                {company.logo && (
+                  <div className="pb-1">
+                    <img src={company.logo} alt="Company Logo" className="h-7 max-w-[100px] object-contain" />
+                  </div>
+                )}
                 <div className="font-extrabold text-[11.5px] uppercase">{company.name}</div>
                 <div className="text-[10.5px] leading-snug">{company.address_line1}</div>
-                <div className="text-[10.5px] font-bold">GSTIN/UIN: {company.gstin}</div>
+                <div className="text-[10.5px] font-bold pt-0.5">GSTIN/UIN: {company.gstin}</div>
                 <div className="text-[10.5px] font-bold">State Name: {company.state_name}, Code: {company.state_code}</div>
               </div>
             )}
@@ -347,9 +355,11 @@ const A4SinglePageCopy = ({ copyType, invoice, company }) => {
             <tbody className="h-full">
               {items.map((item, idx) => {
                 const qty = parseFloat(item.quantity || item.qty || 1);
-                const rate = parseFloat(item.unit_price || item.unit_cost || item.rate || 0);
+                const rate = isPurchase
+                  ? parseFloat(item.unit_cost || item.rate || item.unit_price || 0)
+                  : parseFloat(item.rate ?? item.unit_price ?? item.selling_price ?? item.unit_cost ?? 0);
                 const disc = parseFloat(item.discount_percent || item.discount || 0);
-                const lineAmount = parseFloat(item.amount ?? item.line_total ?? (qty * rate * (1 - disc / 100)));
+                const lineAmount = parseFloat(item.taxable_value ?? item.amount ?? item.line_total ?? (qty * rate * (1 - disc / 100)));
                 const specs = renderItemSpecsAndSku(item);
 
                 return (
@@ -367,10 +377,10 @@ const A4SinglePageCopy = ({ copyType, invoice, company }) => {
                     </td>
                     <td className="border-r border-black py-1.5 px-1 text-center font-mono">{item.hsn_sac || item.hsn_code || '852411'}</td>
                     <td className="border-r border-black py-1.5 px-1 text-right font-bold font-mono">{qty} {item.unit || 'NOS.'}</td>
-                    <td className="border-r border-black py-1.5 px-1 text-right font-mono">{rate.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                    <td className="border-r border-black py-1.5 px-1 text-right font-mono whitespace-nowrap">{rate.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                     <td className="border-r border-black py-1.5 px-1 text-center font-mono uppercase">{item.unit || 'NOS.'}</td>
                     <td className="border-r border-black py-1.5 px-1 text-right font-mono">{disc > 0 ? `${disc}%` : ''}</td>
-                    <td className="py-1.5 px-2 text-right font-bold font-mono">{lineAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                    <td className="py-1.5 px-2 text-right font-bold font-mono whitespace-nowrap">{lineAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                   </tr>
                 );
               })}
@@ -387,7 +397,7 @@ const A4SinglePageCopy = ({ copyType, invoice, company }) => {
                       <td className="border-r border-black"></td>
                       <td className="border-r border-black"></td>
                       <td className="border-r border-black"></td>
-                      <td className="py-0.5 px-2 text-right font-bold font-mono">{totalCgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                      <td className="py-0.5 px-2 text-right font-bold font-mono whitespace-nowrap">{totalCgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                     </tr>
                     <tr className="align-top">
                       <td className="border-r border-black"></td>
@@ -397,7 +407,7 @@ const A4SinglePageCopy = ({ copyType, invoice, company }) => {
                       <td className="border-r border-black"></td>
                       <td className="border-r border-black"></td>
                       <td className="border-r border-black"></td>
-                      <td className="py-0.5 px-2 text-right font-bold font-mono">{totalSgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                      <td className="py-0.5 px-2 text-right font-bold font-mono whitespace-nowrap">{totalSgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                     </tr>
                   </>
                 ) : (
@@ -409,7 +419,7 @@ const A4SinglePageCopy = ({ copyType, invoice, company }) => {
                     <td className="border-r border-black"></td>
                     <td className="border-r border-black"></td>
                     <td className="border-r border-black"></td>
-                    <td className="py-0.5 px-2 text-right font-bold font-mono">{totalIgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                    <td className="py-0.5 px-2 text-right font-bold font-mono whitespace-nowrap">{totalIgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                   </tr>
                 )
               )}
@@ -437,7 +447,7 @@ const A4SinglePageCopy = ({ copyType, invoice, company }) => {
                 <td className="border-r border-black w-[65px]"></td>
                 <td className="border-r border-black w-[45px]"></td>
                 <td className="border-r border-black w-[50px]"></td>
-                <td className="py-1.5 px-2 text-right font-mono text-[12px] w-[85px]">₹ {grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                <td className="py-1.5 px-1 text-right font-mono font-bold text-[11px] w-[85px] whitespace-nowrap">₹&nbsp;{grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
               </tr>
             </tfoot>
           </table>
