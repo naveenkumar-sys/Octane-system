@@ -166,92 +166,92 @@ const A4SinglePageCopy = ({ copyType, invoice, company }) => {
   const paymentStatus = invoice.payment_status || (amountPaid === 0 ? 'UNPAID' : (amountPaid >= grandTotal - 0.01 ? 'PAID' : 'PARTIALLY_PAID'));
 
   return (
-    <div className="w-[210mm] max-w-full h-[297mm] max-h-[297mm] print:w-[210mm] print:max-w-[210mm] print:h-[295mm] print:max-h-[295mm] box-border p-[7mm] print:p-[5mm] flex flex-col justify-between overflow-hidden bg-white text-black font-sans text-[10.5px] leading-tight select-none shadow-2xl print:shadow-none print:border-none mx-auto page-break-inside-avoid">
+    <div className="w-[210mm] max-w-full h-[297mm] max-h-[297mm] print:w-[210mm] print:max-w-[210mm] print:h-[295mm] print:max-h-[295mm] box-border p-[6mm] print:p-[4mm] flex flex-col justify-between overflow-hidden bg-white text-black font-sans text-[11.5px] leading-tight select-none shadow-2xl print:shadow-none print:border-none mx-auto page-break-inside-avoid">
       {/* 1. Header Title & Copy Type */}
       <div className="flex items-center justify-between pb-1 flex-shrink-0">
         <div className="w-1/4"></div>
-        <h1 className="text-base font-extrabold text-center uppercase tracking-wide w-2/4 text-slate-950">
+        <h1 className="text-lg font-black text-center uppercase tracking-wider w-2/4 text-black">
           {documentTitle}
         </h1>
-        <div className="text-[10px] font-bold text-right italic uppercase w-1/4 text-slate-800">
+        <div className="text-[11px] font-bold text-right italic uppercase w-1/4 text-black">
           ({copyType})
         </div>
       </div>
 
       {/* Main Outer Table Box - Stretches dynamically to cover the exact A4 sheet */}
-      <div className="flex-1 flex flex-col justify-between border border-black border-collapse my-0.5 min-h-0 overflow-hidden">
+      <div className="flex-1 flex flex-col justify-between border-[1.5px] border-black border-collapse my-0.5 min-h-0 overflow-hidden text-black">
         {/* Top Grid: Seller + Buyer (Left) & Reference Grid (Right) */}
-        <div className="grid grid-cols-2 border-b border-black flex-shrink-0">
+        <div className="grid grid-cols-2 border-b-[1.5px] border-black flex-shrink-0">
           {/* Left Column: Seller & Buyer */}
-          <div className="border-r border-black flex flex-col justify-between">
+          <div className="border-r-[1.5px] border-black flex flex-col justify-between">
             {/* Upper Box: Vendor (for Purchase) or Company (for Sales) */}
             {!isPurchase ? (
               // Sales: Seller = Company
-              <div className="p-2 space-y-0.5">
+              <div className="p-2.5 space-y-0.5 text-black">
                 {company.logo && (
                   <div className="pb-1">
-                    <img src={company.logo} alt="Company Logo" className="h-8 max-w-[120px] object-contain" />
+                    <img src={company.logo} alt="Company Logo" className="h-9 max-w-[130px] object-contain" />
                   </div>
                 )}
-                <div className="font-extrabold text-[12px] uppercase leading-tight">{company.name}</div>
-                <div className="text-[10.5px] leading-snug font-medium">{company.address_line1}</div>
-                {company.address_line2 && <div className="text-[10.5px] font-medium">{company.address_line2}</div>}
-                <div className="text-[10.5px] font-medium">{company.city_pincode}</div>
-                {company.phone && <div className="text-[10.5px] font-medium">Ph: {company.phone}</div>}
-                {company.email && <div className="text-[10.5px] font-medium">Email: {company.email}</div>}
-                <div className="text-[10.5px] font-bold pt-0.5">GSTIN/UIN: {company.gstin}</div>
-                <div className="text-[10.5px] font-bold">State Name: {company.state_name}, Code: {company.state_code}</div>
+                <div className="font-black text-[13.5px] uppercase leading-tight text-black">{company.name}</div>
+                <div className="text-[11.5px] leading-snug font-semibold text-black">{company.address_line1}</div>
+                {company.address_line2 && <div className="text-[11.5px] font-semibold text-black">{company.address_line2}</div>}
+                <div className="text-[11.5px] font-semibold text-black">{company.city_pincode}</div>
+                {company.phone && <div className="text-[11.5px] font-semibold text-black">Ph: {company.phone}</div>}
+                {company.email && <div className="text-[11.5px] font-semibold text-black">Email: {company.email}</div>}
+                <div className="text-[11.5px] font-black pt-1 text-black">GSTIN/UIN: {company.gstin}</div>
+                <div className="text-[11.5px] font-black text-black">State Name: {company.state_name}, Code: {company.state_code}</div>
               </div>
             ) : (
               // Purchase: Seller = Vendor / Supplier
-              <div className="p-2 space-y-0.5">
-                <div className="text-[9.5px] font-bold text-slate-700 uppercase">Vendor / Supplier (Seller)</div>
-                <div className="font-extrabold text-[12px] uppercase">{invoice.supplier_name || 'Vendor Supplier'}</div>
-                <div className="text-[10.5px] leading-snug font-medium">{invoice.supplier_address || 'Vendor Address'}</div>
-                {invoice.supplier_mobile && <div className="text-[10.5px] font-medium">Ph: {invoice.supplier_mobile}</div>}
-                <div className="text-[10.5px] font-bold pt-0.5">GSTIN/UIN: {invoice.supplier_gstin || '—'}</div>
-                <div className="text-[10.5px] font-bold">State Name: {invoice.supplier_state || 'Karnataka'}, Code: {invoice.supplier_state_code || '29'}</div>
+              <div className="p-2.5 space-y-0.5 text-black">
+                <div className="text-[10.5px] font-bold text-black uppercase">Vendor / Supplier (Seller)</div>
+                <div className="font-black text-[13.5px] uppercase text-black">{invoice.supplier_name || 'Vendor Supplier'}</div>
+                <div className="text-[11.5px] leading-snug font-semibold text-black">{invoice.supplier_address || 'Vendor Address'}</div>
+                {invoice.supplier_mobile && <div className="text-[11.5px] font-semibold text-black">Ph: {invoice.supplier_mobile}</div>}
+                <div className="text-[11.5px] font-black pt-1 text-black">GSTIN/UIN: {invoice.supplier_gstin || '—'}</div>
+                <div className="text-[11.5px] font-black text-black">State Name: {invoice.supplier_state || 'Karnataka'}, Code: {invoice.supplier_state_code || '29'}</div>
               </div>
             )}
 
             {/* Lower Box: Buyer (Customer for Sales, Company for Purchase) */}
             {!isPurchase ? (
               // Sales: Buyer = Customer
-              <div className="border-t border-black p-2 space-y-0.5 bg-slate-50/20">
-                <div className="text-[10px] font-semibold text-slate-700">Buyer (Bill to)</div>
-                <div className="font-extrabold text-[11.5px] uppercase">{invoice.customer_name || invoice.buyer_name || 'Cash Customer'}</div>
-                <div className="text-[10.5px] leading-snug">{invoice.customer_address || invoice.buyer_address || 'Local Customer'}</div>
-                {invoice.customer_mobile && <div className="text-[10.5px] font-medium">Ph: {invoice.customer_mobile}</div>}
-                <div className="text-[10.5px] font-bold pt-0.5">GSTIN/UIN: {invoice.customer_gstin || invoice.buyer_gstin || '—'}</div>
-                <div className="text-[10.5px] font-bold">State Name: {invoice.customer_state || 'Karnataka'}, Code: {invoice.customer_state_code || '29'}</div>
+              <div className="border-t-[1.5px] border-black p-2.5 space-y-0.5 text-black">
+                <div className="text-[10.5px] font-bold text-black uppercase">Buyer (Bill to)</div>
+                <div className="font-black text-[13px] uppercase text-black">{invoice.customer_name || invoice.buyer_name || 'Cash Customer'}</div>
+                <div className="text-[11.5px] leading-snug font-semibold text-black">{invoice.customer_address || invoice.buyer_address || 'Local Customer'}</div>
+                {invoice.customer_mobile && <div className="text-[11.5px] font-semibold text-black">Ph: {invoice.customer_mobile}</div>}
+                <div className="text-[11.5px] font-black pt-1 text-black">GSTIN/UIN: {invoice.customer_gstin || invoice.buyer_gstin || '—'}</div>
+                <div className="text-[11.5px] font-black text-black">State Name: {invoice.customer_state || company.state_name || 'Karnataka'}, Code: {invoice.customer_state_code || company.state_code || '29'}</div>
               </div>
             ) : (
               // Purchase: Buyer = Company (Store / Recipient)
-              <div className="border-t border-black p-2 space-y-0.5 bg-slate-50/20">
-                <div className="text-[10px] font-semibold text-slate-700">Recipient / Buyer (Store)</div>
+              <div className="border-t-[1.5px] border-black p-2.5 space-y-0.5 text-black">
+                <div className="text-[10.5px] font-bold text-black uppercase">Recipient / Buyer (Store)</div>
                 {company.logo && (
                   <div className="pb-1">
-                    <img src={company.logo} alt="Company Logo" className="h-7 max-w-[100px] object-contain" />
+                    <img src={company.logo} alt="Company Logo" className="h-8 max-w-[110px] object-contain" />
                   </div>
                 )}
-                <div className="font-extrabold text-[11.5px] uppercase">{company.name}</div>
-                <div className="text-[10.5px] leading-snug">{company.address_line1}</div>
-                <div className="text-[10.5px] font-bold pt-0.5">GSTIN/UIN: {company.gstin}</div>
-                <div className="text-[10.5px] font-bold">State Name: {company.state_name}, Code: {company.state_code}</div>
+                <div className="font-black text-[13px] uppercase text-black">{company.name}</div>
+                <div className="text-[11.5px] leading-snug font-semibold text-black">{company.address_line1}</div>
+                <div className="text-[11.5px] font-black pt-1 text-black">GSTIN/UIN: {company.gstin}</div>
+                <div className="text-[11.5px] font-black text-black">State Name: {company.state_name}, Code: {company.state_code}</div>
               </div>
             )}
           </div>
 
           {/* Right Column: Reference Grid */}
-          <div className="text-[10.5px]">
-            <div className="grid grid-cols-2 border-b border-black">
-              <div className="p-1.5 border-r border-black">
-                <div className="text-[9.5px] text-slate-700">{isPurchase ? 'OCTANE Purchase No.' : 'Invoice No.'}</div>
-                <div className="font-extrabold text-[11px]">{invoice.invoice_number || invoice.purchase_number || invoice.number || 'INV-001'}</div>
+          <div className="text-[11.5px] text-black">
+            <div className="grid grid-cols-2 border-b-[1.5px] border-black">
+              <div className="p-2 border-r-[1.5px] border-black">
+                <div className="text-[10px] font-bold text-black uppercase tracking-wider">{isPurchase ? 'OCTANE Purchase No.' : 'Invoice No.'}</div>
+                <div className="font-black text-[13px] font-mono text-black">{invoice.invoice_number || invoice.purchase_number || invoice.number || 'INV-001'}</div>
               </div>
-              <div className="p-1.5">
-                <div className="text-[9.5px] text-slate-700">Dated</div>
-                <div className="font-extrabold text-[11px]">{invoice.invoice_date || invoice.purchase_date || invoice.created_at || new Date().toLocaleDateString('en-IN')}</div>
+              <div className="p-2">
+                <div className="text-[10px] font-bold text-black uppercase tracking-wider">Dated</div>
+                <div className="font-black text-[13px] font-mono text-black">{invoice.invoice_date || invoice.purchase_date || invoice.created_at || new Date().toLocaleDateString('en-IN')}</div>
               </div>
             </div>
 
@@ -259,78 +259,78 @@ const A4SinglePageCopy = ({ copyType, invoice, company }) => {
               <>
                 <div className="grid grid-cols-2 border-b border-black">
                   <div className="p-1.5 border-r border-black">
-                    <div className="text-[9.5px] text-slate-700">Supplier Invoice No.</div>
-                    <div className="font-bold">{invoice.supplier_invoice_number || '—'}</div>
+                    <div className="text-[10px] font-bold text-black uppercase">Supplier Invoice No.</div>
+                    <div className="font-bold text-[11.5px] text-black">{invoice.supplier_invoice_number || '—'}</div>
                   </div>
                   <div className="p-1.5">
-                    <div className="text-[9.5px] text-slate-700">Payment Mode</div>
-                    <div className="font-bold">{invoice.payment_mode || 'Cash'}</div>
+                    <div className="text-[10px] font-bold text-black uppercase">Payment Mode</div>
+                    <div className="font-bold text-[11.5px] text-black">{invoice.payment_mode || 'Cash'}</div>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 border-b border-black">
                   <div className="p-1.5 border-r border-black">
-                    <div className="text-[9.5px] text-slate-700">Collected / Paid via</div>
-                    <div className="font-semibold">{invoice.partner_allocation_json?.partner_name ? `Partner: ${invoice.partner_allocation_json.partner_name}` : (invoice.paid_by_partner_name || 'Company Account')}</div>
+                    <div className="text-[10px] font-bold text-black uppercase">Collected / Paid via</div>
+                    <div className="font-bold text-[11.5px] text-black">{invoice.partner_allocation_json?.partner_name ? `Partner: ${invoice.partner_allocation_json.partner_name}` : (invoice.paid_by_partner_name || 'Company Account')}</div>
                   </div>
                   <div className="p-1.5">
-                    <div className="text-[9.5px] text-slate-700">Payment Status</div>
-                    <div className="font-bold uppercase text-[10.5px]">{paymentStatus}</div>
+                    <div className="text-[10px] font-bold text-black uppercase">Payment Status</div>
+                    <div className="font-black uppercase text-[11.5px] text-black">{paymentStatus}</div>
                   </div>
                 </div>
-                <div className="p-1.5 min-h-[42px]">
-                  <div className="text-[9.5px] text-slate-700">Notes / Remarks</div>
-                  <div className="font-semibold text-[10px]">{invoice.notes || 'Vendor Stock Entry'}</div>
+                <div className="p-1.5 min-h-[38px]">
+                  <div className="text-[10px] font-bold text-black uppercase">Notes / Remarks</div>
+                  <div className="font-bold text-[11px] text-black">{invoice.notes || 'Vendor Stock Entry'}</div>
                 </div>
               </>
             ) : (
               <>
                 <div className="grid grid-cols-2 border-b border-black">
                   <div className="p-1.5 border-r border-black">
-                    <div className="text-[9.5px] text-slate-700">Delivery Note</div>
-                    <div className="font-semibold">{invoice.delivery_note || '—'}</div>
+                    <div className="text-[10px] font-bold text-black uppercase">Delivery Note</div>
+                    <div className="font-bold text-[11.5px] text-black">{invoice.delivery_note || '—'}</div>
                   </div>
                   <div className="p-1.5">
-                    <div className="text-[9.5px] text-slate-700">Mode/Terms of Payment</div>
-                    <div className="font-semibold">{invoice.payment_terms || invoice.payment_mode || 'Cash / Immediate'}</div>
+                    <div className="text-[10px] font-bold text-black uppercase">Mode/Terms of Payment</div>
+                    <div className="font-bold text-[11.5px] text-black">{invoice.payment_terms || invoice.payment_mode || 'Cash / Immediate'}</div>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 border-b border-black">
                   <div className="p-1.5 border-r border-black">
-                    <div className="text-[9.5px] text-slate-700">Reference No. & Date.</div>
-                    <div className="font-semibold">{invoice.reference_no || '—'}</div>
+                    <div className="text-[10px] font-bold text-black uppercase">Reference No. & Date.</div>
+                    <div className="font-bold text-[11.5px] text-black">{invoice.reference_no || '—'}</div>
                   </div>
                   <div className="p-1.5">
-                    <div className="text-[9.5px] text-slate-700">Other References</div>
-                    <div className="font-semibold">{invoice.other_references || '—'}</div>
+                    <div className="text-[10px] font-bold text-black uppercase">Other References</div>
+                    <div className="font-bold text-[11.5px] text-black">{invoice.other_references || '—'}</div>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 border-b border-black">
                   <div className="p-1.5 border-r border-black">
-                    <div className="text-[9.5px] text-slate-700">Buyer's Order No.</div>
-                    <div className="font-semibold">{invoice.buyer_order_no || '—'}</div>
+                    <div className="text-[10px] font-bold text-black uppercase">Buyer's Order No.</div>
+                    <div className="font-bold text-[11.5px] text-black">{invoice.buyer_order_no || '—'}</div>
                   </div>
                   <div className="p-1.5">
-                    <div className="text-[9.5px] text-slate-700">Dated</div>
-                    <div className="font-semibold">{invoice.buyer_order_date || '—'}</div>
+                    <div className="text-[10px] font-bold text-black uppercase">Dated</div>
+                    <div className="font-bold text-[11.5px] text-black">{invoice.buyer_order_date || '—'}</div>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 border-b border-black">
                   <div className="p-1.5 border-r border-black">
-                    <div className="text-[9.5px] text-slate-700">Dispatch Doc No.</div>
-                    <div className="font-semibold">{invoice.dispatch_doc_no || '—'}</div>
+                    <div className="text-[10px] font-bold text-black uppercase">Dispatch Doc No.</div>
+                    <div className="font-bold text-[11.5px] text-black">{invoice.dispatch_doc_no || '—'}</div>
                   </div>
                   <div className="p-1.5">
-                    <div className="text-[9.5px] text-slate-700">Dispatched through</div>
-                    <div className="font-semibold">{invoice.dispatched_through || 'Hand Delivery'}</div>
+                    <div className="text-[10px] font-bold text-black uppercase">Dispatched through</div>
+                    <div className="font-bold text-[11.5px] text-black">{invoice.dispatched_through || 'Hand Delivery'}</div>
                   </div>
                 </div>
 
                 <div className="p-1.5 min-h-[38px]">
-                  <div className="text-[9.5px] text-slate-700">Terms of Delivery</div>
-                  <div className="font-semibold text-[10px]">{invoice.terms_of_delivery || 'Goods once sold will not be taken back or exchanged.'}</div>
+                  <div className="text-[10px] font-bold text-black uppercase">Terms of Delivery</div>
+                  <div className="font-bold text-[10.5px] text-black leading-snug">{invoice.terms_of_delivery || 'Goods once sold will not be taken back or exchanged.'}</div>
                 </div>
               </>
             )}
@@ -338,18 +338,18 @@ const A4SinglePageCopy = ({ copyType, invoice, company }) => {
         </div>
 
         {/* 4. Item Table Section - Expands to bridge all remaining vertical space */}
-        <div className="flex-1 flex flex-col border-b border-black min-h-[140px]">
-          <table className="w-full border-collapse text-[10.5px] table-fixed flex-1 h-full">
+        <div className="flex-1 flex flex-col border-b-[1.5px] border-black min-h-[140px] text-black">
+          <table className="w-full border-collapse text-[11.5px] table-fixed flex-1 h-full text-black">
             <thead>
-              <tr className="border-b border-black bg-slate-50/50 text-[10px] font-bold">
-                <th className="border-r border-black py-1 px-1 text-center w-[30px]">Sl<br/>No.</th>
-                <th className="border-r border-black py-1 px-2 text-left">Description of Goods</th>
-                <th className="border-r border-black py-1 px-1 text-center w-[70px]">HSN/SAC</th>
-                <th className="border-r border-black py-1 px-1 text-right w-[60px]">Quantity</th>
-                <th className="border-r border-black py-1 px-1 text-right w-[65px]">Rate</th>
-                <th className="border-r border-black py-1 px-1 text-center w-[45px]">per</th>
-                <th className="border-r border-black py-1 px-1 text-right w-[50px]">Disc. %</th>
-                <th className="py-1 px-2 text-right w-[85px]">Amount</th>
+              <tr className="border-b-[1.5px] border-black bg-black/5 text-[11px] font-black text-black uppercase tracking-wider">
+                <th className="border-r border-black py-1.5 px-1 text-center w-[35px] font-black">Sl<br/>No.</th>
+                <th className="border-r border-black py-1.5 px-2 text-left font-black">Description of Goods</th>
+                <th className="border-r border-black py-1.5 px-1 text-center w-[75px] font-black">HSN/SAC</th>
+                <th className="border-r border-black py-1.5 px-1 text-right w-[65px] font-black">Quantity</th>
+                <th className="border-r border-black py-1.5 px-1 text-right w-[75px] font-black">Rate</th>
+                <th className="border-r border-black py-1.5 px-1 text-center w-[45px] font-black">per</th>
+                <th className="border-r border-black py-1.5 px-1 text-right w-[50px] font-black">Disc. %</th>
+                <th className="py-1.5 px-2 text-right w-[95px] font-black">Amount</th>
               </tr>
             </thead>
             <tbody className="h-full">
@@ -363,24 +363,24 @@ const A4SinglePageCopy = ({ copyType, invoice, company }) => {
                 const specs = renderItemSpecsAndSku(item);
 
                 return (
-                  <tr key={idx} className="align-top page-break-inside-avoid">
-                    <td className="border-r border-black py-1.5 px-1 text-center font-semibold">{idx + 1}</td>
-                    <td className="border-r border-black py-1.5 px-2">
-                      <div className="font-extrabold uppercase">{item.product_name || item.description || 'Product Item'}</div>
+                  <tr key={idx} className="align-top page-break-inside-avoid text-black text-[11.5px]">
+                    <td className="border-r border-black py-2 px-1 text-center font-bold">{idx + 1}</td>
+                    <td className="border-r border-black py-2 px-2">
+                      <div className="font-black text-[12px] uppercase text-black">{item.product_name || item.description || 'Product Item'}</div>
                       {specs.length > 0 && (
-                        <div className="text-[9px] italic font-normal text-slate-800 space-y-0.5 mt-0.5 pl-1">
+                        <div className="text-[10px] font-semibold text-black space-y-0.5 mt-0.5 pl-1">
                           {specs.map((s, i) => (
                             <div key={i}>{s}</div>
                           ))}
                         </div>
                       )}
                     </td>
-                    <td className="border-r border-black py-1.5 px-1 text-center font-mono">{item.hsn_sac || item.hsn_code || '852411'}</td>
-                    <td className="border-r border-black py-1.5 px-1 text-right font-bold font-mono">{qty} {item.unit || 'NOS.'}</td>
-                    <td className="border-r border-black py-1.5 px-1 text-right font-mono whitespace-nowrap">{rate.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                    <td className="border-r border-black py-1.5 px-1 text-center font-mono uppercase">{item.unit || 'NOS.'}</td>
-                    <td className="border-r border-black py-1.5 px-1 text-right font-mono">{disc > 0 ? `${disc}%` : ''}</td>
-                    <td className="py-1.5 px-2 text-right font-bold font-mono whitespace-nowrap">{lineAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                    <td className="border-r border-black py-2 px-1 text-center font-bold font-mono text-[11.5px] text-black">{item.hsn_sac || item.hsn_code || '852411'}</td>
+                    <td className="border-r border-black py-2 px-1 text-right font-black font-mono text-[11.5px] text-black">{qty} {item.unit || 'NOS.'}</td>
+                    <td className="border-r border-black py-2 px-1 text-right font-bold font-mono text-[11.5px] whitespace-nowrap text-black">{rate.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                    <td className="border-r border-black py-2 px-1 text-center font-bold font-mono text-[11px] uppercase text-black">{item.unit || 'NOS.'}</td>
+                    <td className="border-r border-black py-2 px-1 text-right font-bold font-mono text-[11.5px] text-black">{disc > 0 ? `${disc}%` : ''}</td>
+                    <td className="py-2 px-2 text-right font-black font-mono text-[12px] whitespace-nowrap text-black">{lineAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                   </tr>
                 );
               })}
@@ -389,37 +389,37 @@ const A4SinglePageCopy = ({ copyType, invoice, company }) => {
               {!isNonGst && totalTaxAmount > 0 && (
                 !invoice.is_interstate ? (
                   <>
-                    <tr className="align-top">
+                    <tr className="align-top text-black text-[11.5px]">
                       <td className="border-r border-black"></td>
-                      <td className="border-r border-black py-0.5 px-2 font-bold italic text-right pr-6">CGST OUTPUT</td>
-                      <td className="border-r border-black"></td>
-                      <td className="border-r border-black"></td>
+                      <td className="border-r border-black py-1 px-2 font-black italic text-right pr-6 text-black">CGST OUTPUT</td>
                       <td className="border-r border-black"></td>
                       <td className="border-r border-black"></td>
                       <td className="border-r border-black"></td>
-                      <td className="py-0.5 px-2 text-right font-bold font-mono whitespace-nowrap">{totalCgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                      <td className="border-r border-black"></td>
+                      <td className="border-r border-black"></td>
+                      <td className="py-1 px-2 text-right font-black font-mono text-[12px] whitespace-nowrap text-black">{totalCgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                     </tr>
-                    <tr className="align-top">
+                    <tr className="align-top text-black text-[11.5px]">
                       <td className="border-r border-black"></td>
-                      <td className="border-r border-black py-0.5 px-2 font-bold italic text-right pr-6">SGST OUTPUT</td>
-                      <td className="border-r border-black"></td>
-                      <td className="border-r border-black"></td>
+                      <td className="border-r border-black py-1 px-2 font-black italic text-right pr-6 text-black">SGST OUTPUT</td>
                       <td className="border-r border-black"></td>
                       <td className="border-r border-black"></td>
                       <td className="border-r border-black"></td>
-                      <td className="py-0.5 px-2 text-right font-bold font-mono whitespace-nowrap">{totalSgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                      <td className="border-r border-black"></td>
+                      <td className="border-r border-black"></td>
+                      <td className="py-1 px-2 text-right font-black font-mono text-[12px] whitespace-nowrap text-black">{totalSgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                     </tr>
                   </>
                 ) : (
-                  <tr className="align-top">
+                  <tr className="align-top text-black text-[11.5px]">
                     <td className="border-r border-black"></td>
-                    <td className="border-r border-black py-0.5 px-2 font-bold italic text-right pr-6">IGST OUTPUT</td>
-                    <td className="border-r border-black"></td>
-                    <td className="border-r border-black"></td>
+                    <td className="border-r border-black py-1 px-2 font-black italic text-right pr-6 text-black">IGST OUTPUT</td>
                     <td className="border-r border-black"></td>
                     <td className="border-r border-black"></td>
                     <td className="border-r border-black"></td>
-                    <td className="py-0.5 px-2 text-right font-bold font-mono whitespace-nowrap">{totalIgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                    <td className="border-r border-black"></td>
+                    <td className="border-r border-black"></td>
+                    <td className="py-1 px-2 text-right font-black font-mono text-[12px] whitespace-nowrap text-black">{totalIgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                   </tr>
                 )
               )}
@@ -438,151 +438,151 @@ const A4SinglePageCopy = ({ copyType, invoice, company }) => {
             </tbody>
 
             {/* Item Table Total Row - always pinned at the bottom of the items section */}
-            <tfoot className="border-t border-black bg-slate-50/40 font-extrabold text-[10.5px]">
+            <tfoot className="border-t-[1.5px] border-black bg-black/5 font-black text-[12px] text-black">
               <tr>
-                <td className="border-r border-black w-[30px]"></td>
-                <td className="border-r border-black py-1.5 px-2 text-right">Total</td>
-                <td className="border-r border-black w-[70px]"></td>
-                <td className="border-r border-black py-1.5 px-1 text-right font-mono w-[60px]">{totalQuantity} {items[0]?.unit || 'NOS.'}</td>
-                <td className="border-r border-black w-[65px]"></td>
+                <td className="border-r border-black w-[35px]"></td>
+                <td className="border-r border-black py-2 px-2 text-right font-black uppercase text-[12px]">Total</td>
+                <td className="border-r border-black w-[75px]"></td>
+                <td className="border-r border-black py-2 px-1 text-right font-black font-mono text-[12px] w-[65px] text-black">{totalQuantity} {items[0]?.unit || 'NOS.'}</td>
+                <td className="border-r border-black w-[75px]"></td>
                 <td className="border-r border-black w-[45px]"></td>
                 <td className="border-r border-black w-[50px]"></td>
-                <td className="py-1.5 px-1 text-right font-mono font-bold text-[11px] w-[85px] whitespace-nowrap">₹&nbsp;{grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                <td className="py-2 px-1 text-right font-mono font-black text-[13px] w-[95px] whitespace-nowrap text-black">₹&nbsp;{grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
               </tr>
             </tfoot>
           </table>
         </div>
 
         {/* Bottom Section: Summary, Declarations, Signatures */}
-        <div className="flex-shrink-0">
+        <div className="flex-shrink-0 text-black">
           {/* 5. Amount Chargeable in Words */}
-          <div className="border-b border-black p-1.5 flex items-center justify-between text-[10.5px]">
+          <div className="border-b-[1.5px] border-black p-2 flex items-center justify-between text-black">
             <div>
-              <span className="text-[9.5px] text-slate-700 block">Amount Chargeable (in words)</span>
-              <span className="font-extrabold text-[11px] block">{numberToWordsRupees(grandTotal)}</span>
+              <span className="text-[10px] font-bold text-black uppercase tracking-wider block">Amount Chargeable (in words)</span>
+              <span className="font-black text-[12.5px] text-black block">{numberToWordsRupees(grandTotal)}</span>
             </div>
-            <div className="font-bold italic text-[10px]">E. & O.E</div>
+            <div className="font-black italic text-[11px] text-black">E. & O.E</div>
           </div>
 
           {/* 6. HSN/SAC Tax Summary Table & Tax Amount in Words (GST Invoices Only) */}
           {!isNonGst && totalTaxAmount > 0 && (
             <>
-              <table className="w-full border-collapse text-[10px]">
+              <table className="w-full border-collapse text-[11px] text-black">
                 <thead>
-                  <tr className="border-b border-black bg-slate-50/50 font-bold">
-                    <th className="border-r border-black py-0.5 px-1 text-left" rowSpan={2}>HSN/SAC</th>
-                    <th className="border-r border-black py-0.5 px-1 text-right" rowSpan={2}>Taxable<br/>Value</th>
+                  <tr className="border-b-[1.5px] border-black bg-black/5 font-black text-black uppercase">
+                    <th className="border-r border-black py-1 px-1.5 text-left" rowSpan={2}>HSN/SAC</th>
+                    <th className="border-r border-black py-1 px-1.5 text-right" rowSpan={2}>Taxable<br/>Value</th>
                     {!invoice.is_interstate ? (
                       <>
-                        <th className="border-r border-black py-0.5 px-1 text-center" colSpan={2}>CGST</th>
-                        <th className="border-r border-black py-0.5 px-1 text-center" colSpan={2}>SGST/UTGST</th>
+                        <th className="border-r border-black py-1 px-1 text-center" colSpan={2}>CGST</th>
+                        <th className="border-r border-black py-1 px-1 text-center" colSpan={2}>SGST/UTGST</th>
                       </>
                     ) : (
-                      <th className="border-r border-black py-0.5 px-1 text-center" colSpan={2}>IGST</th>
+                      <th className="border-r border-black py-1 px-1 text-center" colSpan={2}>IGST</th>
                     )}
-                    <th className="py-0.5 px-1 text-right" rowSpan={2}>Total<br/>Tax Amount</th>
+                    <th className="py-1 px-1.5 text-right" rowSpan={2}>Total<br/>Tax Amount</th>
                   </tr>
-                  <tr className="border-b border-black bg-slate-50/50 font-bold text-[9px]">
+                  <tr className="border-b border-black bg-black/5 font-black text-[10px] text-black uppercase">
                     {!invoice.is_interstate ? (
                       <>
-                        <th className="border-r border-black py-0.5 px-1 text-center w-[40px]">Rate</th>
-                        <th className="border-r border-black py-0.5 px-1 text-right w-[65px]">Amount</th>
-                        <th className="border-r border-black py-0.5 px-1 text-center w-[40px]">Rate</th>
-                        <th className="border-r border-black py-0.5 px-1 text-right w-[65px]">Amount</th>
+                        <th className="border-r border-black py-1 px-1 text-center w-[45px]">Rate</th>
+                        <th className="border-r border-black py-1 px-1 text-right w-[70px]">Amount</th>
+                        <th className="border-r border-black py-1 px-1 text-center w-[45px]">Rate</th>
+                        <th className="border-r border-black py-1 px-1 text-right w-[70px]">Amount</th>
                       </>
                     ) : (
                       <>
-                        <th className="border-r border-black py-0.5 px-1 text-center w-[50px]">Rate</th>
-                        <th className="border-r border-black py-0.5 px-1 text-right w-[90px]">Amount</th>
+                        <th className="border-r border-black py-1 px-1 text-center w-[55px]">Rate</th>
+                        <th className="border-r border-black py-1 px-1 text-right w-[95px]">Amount</th>
                       </>
                     )}
                   </tr>
                 </thead>
                 <tbody>
                   {hsnSummary.map((h, i) => (
-                    <tr key={i} className="border-b border-black font-mono">
-                      <td className="border-r border-black py-0.5 px-1 font-bold">{h.hsn_sac}</td>
-                      <td className="border-r border-black py-0.5 px-1 text-right">{h.taxable_value.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                    <tr key={i} className="border-b border-black font-mono font-bold text-black text-[11px]">
+                      <td className="border-r border-black py-1 px-1.5 font-black">{h.hsn_sac}</td>
+                      <td className="border-r border-black py-1 px-1.5 text-right">{h.taxable_value.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                       {!invoice.is_interstate ? (
                         <>
-                          <td className="border-r border-black py-0.5 px-1 text-center">{h.cgst_rate}</td>
-                          <td className="border-r border-black py-0.5 px-1 text-right">{h.cgst_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                          <td className="border-r border-black py-0.5 px-1 text-center">{h.sgst_rate}</td>
-                          <td className="border-r border-black py-0.5 px-1 text-right">{h.sgst_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                          <td className="border-r border-black py-1 px-1 text-center">{h.cgst_rate}</td>
+                          <td className="border-r border-black py-1 px-1 text-right">{h.cgst_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                          <td className="border-r border-black py-1 px-1 text-center">{h.sgst_rate}</td>
+                          <td className="border-r border-black py-1 px-1 text-right">{h.sgst_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                         </>
                       ) : (
                         <>
-                          <td className="border-r border-black py-0.5 px-1 text-center">{h.igst_rate}</td>
-                          <td className="border-r border-black py-0.5 px-1 text-right">{h.igst_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                          <td className="border-r border-black py-1 px-1 text-center">{h.igst_rate}</td>
+                          <td className="border-r border-black py-1 px-1 text-right">{h.igst_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                         </>
                       )}
-                      <td className="py-0.5 px-1 text-right font-bold">{h.total_tax.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                      <td className="py-1 px-1.5 text-right font-black">{h.total_tax.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                     </tr>
                   ))}
                   {/* HSN Summary Total Row */}
-                  <tr className="font-extrabold font-mono border-b border-black bg-slate-50/30">
-                    <td className="border-r border-black py-0.5 px-1 text-right font-sans">Total</td>
-                    <td className="border-r border-black py-0.5 px-1 text-right">{totalTaxable.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                  <tr className="font-black font-mono border-b-[1.5px] border-black bg-black/5 text-[11.5px] text-black">
+                    <td className="border-r border-black py-1 px-1.5 text-right font-sans uppercase">Total</td>
+                    <td className="border-r border-black py-1 px-1.5 text-right">{totalTaxable.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                     {!invoice.is_interstate ? (
                       <>
                         <td className="border-r border-black"></td>
-                        <td className="border-r border-black py-0.5 px-1 text-right">{totalCgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                        <td className="border-r border-black py-1 px-1 text-right">{totalCgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                         <td className="border-r border-black"></td>
-                        <td className="border-r border-black py-0.5 px-1 text-right">{totalSgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                        <td className="border-r border-black py-1 px-1 text-right">{totalSgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                       </>
                     ) : (
                       <>
                         <td className="border-r border-black"></td>
-                        <td className="border-r border-black py-0.5 px-1 text-right">{totalIgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                        <td className="border-r border-black py-1 px-1 text-right">{totalIgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                       </>
                     )}
-                    <td className="py-0.5 px-1 text-right">{totalTaxAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                    <td className="py-1 px-1.5 text-right font-black">{totalTaxAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                   </tr>
                 </tbody>
               </table>
 
               {/* 7. Tax Amount in Words */}
-              <div className="border-b border-black p-1 text-[10px]">
-                <span className="font-normal text-slate-800">Tax Amount (in words) : </span>
-                <span className="font-extrabold">{numberToWordsRupees(totalTaxAmount)}</span>
+              <div className="border-b-[1.5px] border-black p-1.5 text-black">
+                <span className="font-bold text-[10.5px] text-black uppercase">Tax Amount (in words) : </span>
+                <span className="font-black text-[12px] text-black">{numberToWordsRupees(totalTaxAmount)}</span>
               </div>
             </>
           )}
 
           {/* 8. Declaration & Bank Details */}
-          <div className="grid grid-cols-2 border-b border-black text-[10px]">
+          <div className="grid grid-cols-2 border-b-[1.5px] border-black text-black">
             {/* Declaration */}
-            <div className="border-r border-black p-1.5 space-y-1">
-              <div className="font-bold underline text-[9.5px]">Declaration</div>
-              <p className="text-[9px] leading-tight text-slate-800">
+            <div className="border-r-[1.5px] border-black p-2 space-y-1">
+              <div className="font-black underline text-[10.5px] uppercase tracking-wider text-black">Declaration</div>
+              <p className="text-[10px] leading-snug font-semibold text-black">
                 We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.
               </p>
             </div>
 
             {/* Bank Details */}
-            <div className="p-1.5 space-y-0.5 text-[9.5px]">
-              <div className="font-bold underline">Company's Bank Details</div>
-              <div><span className="font-semibold text-slate-700">Bank Name: </span><span className="font-bold">{company.bank_name}</span></div>
-              <div><span className="font-semibold text-slate-700">A/c No.: </span><span className="font-bold">{company.bank_account}</span></div>
-              <div><span className="font-semibold text-slate-700">Branch & IFS Code: </span><span className="font-bold">{company.bank_ifsc}</span></div>
+            <div className="p-2 space-y-0.5 text-[10.5px] text-black">
+              <div className="font-black underline uppercase tracking-wider text-black">Company's Bank Details</div>
+              <div><span className="font-bold text-black">Bank Name: </span><span className="font-black text-black">{company.bank_name}</span></div>
+              <div><span className="font-bold text-black">A/c No.: </span><span className="font-black text-black">{company.bank_account}</span></div>
+              <div><span className="font-bold text-black">Branch & IFS Code: </span><span className="font-black text-black">{company.bank_ifsc}</span></div>
             </div>
           </div>
 
           {/* 10. Signatures Grid */}
-          <div className="grid grid-cols-2 text-[10px] min-h-[48px] items-end p-1.5">
-            <div className="font-bold text-slate-800">Customer's / Vendor's Seal and Signature</div>
-            <div className="text-right space-y-4">
-              <div className="font-bold text-slate-900">for {company.name}</div>
-              <div className="font-bold text-slate-800">Authorised Signatory</div>
+          <div className="grid grid-cols-2 text-black min-h-[52px] items-end p-2">
+            <div className="font-bold text-[11px] text-black">Customer's / Vendor's Seal and Signature</div>
+            <div className="text-right space-y-5">
+              <div className="font-black text-[12px] text-black">for {company.name}</div>
+              <div className="font-bold text-[11px] text-black">Authorised Signatory</div>
             </div>
           </div>
         </div>
       </div>
 
       {/* 11. Jurisdiction & Computer Generated Footer */}
-      <div className="flex-shrink-0 pt-0.5 text-center text-[9px] font-bold space-y-0.2">
+      <div className="flex-shrink-0 pt-1 text-center text-[10px] font-bold text-black space-y-0.5">
         <div>SUBJECT TO {company.city ? company.city.toUpperCase() : 'BENGALURU'} JURISDICTION</div>
-        <div className="font-normal italic text-slate-600">This is a Computer Generated Document</div>
+        <div className="font-semibold italic text-black">This is a Computer Generated Document</div>
       </div>
     </div>
   );
