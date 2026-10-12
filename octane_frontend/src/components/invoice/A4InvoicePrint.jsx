@@ -330,8 +330,8 @@ const A4SinglePageCopy = ({ copyType, invoice, company }) => {
         </div>
 
         {/* 4. Item Table Section - Expands to bridge all remaining vertical space */}
-        <div className="flex-1 flex flex-col justify-between border-b border-black min-h-[140px] overflow-hidden">
-          <table className="w-full border-collapse text-[10.5px] table-fixed flex-1 h-full" style={{ minHeight: '100%' }}>
+        <div className="flex-1 flex flex-col border-b border-black min-h-[140px]">
+          <table className="w-full border-collapse text-[10.5px] table-fixed flex-1 h-full">
             <thead>
               <tr className="border-b border-black bg-slate-50/50 text-[10px] font-bold">
                 <th className="border-r border-black py-1 px-1 text-center w-[30px]">Sl<br/>No.</th>
@@ -426,22 +426,20 @@ const A4SinglePageCopy = ({ copyType, invoice, company }) => {
                 <td>&nbsp;</td>
               </tr>
             </tbody>
-          </table>
 
-          {/* Item Table Total Row - always pinned at the bottom of the items section */}
-          <table className="w-full border-collapse text-[10.5px] table-fixed border-t border-black bg-slate-50/40 font-extrabold flex-shrink-0">
-            <tbody>
+            {/* Item Table Total Row - always pinned at the bottom of the items section */}
+            <tfoot className="border-t border-black bg-slate-50/40 font-extrabold text-[10.5px]">
               <tr>
                 <td className="border-r border-black w-[30px]"></td>
                 <td className="border-r border-black py-1.5 px-2 text-right">Total</td>
                 <td className="border-r border-black w-[70px]"></td>
-                <td className="border-r border-black py-1.5 px-1 text-right font-mono w-[60px]">{totalQuantity} NOS.</td>
+                <td className="border-r border-black py-1.5 px-1 text-right font-mono w-[60px]">{totalQuantity} {items[0]?.unit || 'NOS.'}</td>
                 <td className="border-r border-black w-[65px]"></td>
                 <td className="border-r border-black w-[45px]"></td>
                 <td className="border-r border-black w-[50px]"></td>
                 <td className="py-1.5 px-2 text-right font-mono text-[12px] w-[85px]">₹ {grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
               </tr>
-            </tbody>
+            </tfoot>
           </table>
         </div>
 
