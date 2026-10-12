@@ -341,14 +341,14 @@ const A4SinglePageCopy = ({ copyType, invoice, company }) => {
         <div className="flex-1 flex flex-col border-b-[1.5px] border-black min-h-[140px] text-black">
           <table className="w-full border-collapse text-[11.5px] table-fixed flex-1 h-full text-black">
             <thead>
-              <tr className="border-b-[1.5px] border-black bg-black/5 text-[11px] font-black text-black uppercase tracking-wider">
+              <tr className="border-b-[1.5px] border-black bg-black/5 text-[11px] font-black text-black uppercase tracking-normal">
                 <th className="border-r border-black py-1.5 px-1 text-center w-[35px] font-black">Sl<br/>No.</th>
                 <th className="border-r border-black py-1.5 px-2 text-left font-black">Description of Goods</th>
-                <th className="border-r border-black py-1.5 px-1 text-center w-[75px] font-black">HSN/SAC</th>
-                <th className="border-r border-black py-1.5 px-1 text-right w-[65px] font-black">Quantity</th>
-                <th className="border-r border-black py-1.5 px-1 text-right w-[75px] font-black">Rate</th>
-                <th className="border-r border-black py-1.5 px-1 text-center w-[45px] font-black">per</th>
-                <th className="border-r border-black py-1.5 px-1 text-right w-[50px] font-black">Disc. %</th>
+                <th className="border-r border-black py-1.5 px-1 text-center w-[68px] font-black">HSN/SAC</th>
+                <th className="border-r border-black py-1.5 px-2 text-center w-[78px] font-black">Quantity</th>
+                <th className="border-r border-black py-1.5 px-2 text-right w-[80px] font-black">Rate</th>
+                <th className="border-r border-black py-1.5 px-1 text-center w-[40px] font-black">per</th>
+                <th className="border-r border-black py-1.5 px-1 text-right w-[46px] font-black">Disc. %</th>
                 <th className="py-1.5 px-2 text-right w-[95px] font-black">Amount</th>
               </tr>
             </thead>
@@ -376,8 +376,8 @@ const A4SinglePageCopy = ({ copyType, invoice, company }) => {
                       )}
                     </td>
                     <td className="border-r border-black py-2 px-1 text-center font-bold font-mono text-[11.5px] text-black">{item.hsn_sac || item.hsn_code || '852411'}</td>
-                    <td className="border-r border-black py-2 px-1 text-right font-black font-mono text-[11.5px] text-black">{qty} {item.unit || 'NOS.'}</td>
-                    <td className="border-r border-black py-2 px-1 text-right font-bold font-mono text-[11.5px] whitespace-nowrap text-black">{rate.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                    <td className="border-r border-black py-2 px-2 text-right font-black font-mono text-[11.5px] text-black whitespace-nowrap">{qty} {item.unit || 'NOS.'}</td>
+                    <td className="border-r border-black py-2 px-2 text-right font-bold font-mono text-[11.5px] whitespace-nowrap text-black">{rate.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                     <td className="border-r border-black py-2 px-1 text-center font-bold font-mono text-[11px] uppercase text-black">{item.unit || 'NOS.'}</td>
                     <td className="border-r border-black py-2 px-1 text-right font-bold font-mono text-[11.5px] text-black">{disc > 0 ? `${disc}%` : ''}</td>
                     <td className="py-2 px-2 text-right font-black font-mono text-[12px] whitespace-nowrap text-black">{lineAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
@@ -442,12 +442,12 @@ const A4SinglePageCopy = ({ copyType, invoice, company }) => {
               <tr>
                 <td className="border-r border-black w-[35px]"></td>
                 <td className="border-r border-black py-2 px-2 text-right font-black uppercase text-[12px]">Total</td>
-                <td className="border-r border-black w-[75px]"></td>
-                <td className="border-r border-black py-2 px-1 text-right font-black font-mono text-[12px] w-[65px] text-black">{totalQuantity} {items[0]?.unit || 'NOS.'}</td>
-                <td className="border-r border-black w-[75px]"></td>
-                <td className="border-r border-black w-[45px]"></td>
-                <td className="border-r border-black w-[50px]"></td>
-                <td className="py-2 px-1 text-right font-mono font-black text-[13px] w-[95px] whitespace-nowrap text-black">₹&nbsp;{grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                <td className="border-r border-black w-[68px]"></td>
+                <td className="border-r border-black py-2 px-2 text-right font-black font-mono text-[12px] w-[78px] text-black whitespace-nowrap">{totalQuantity} {items[0]?.unit || 'NOS.'}</td>
+                <td className="border-r border-black w-[80px]"></td>
+                <td className="border-r border-black w-[40px]"></td>
+                <td className="border-r border-black w-[46px]"></td>
+                <td className="py-2 px-2 text-right font-mono font-black text-[13px] w-[95px] whitespace-nowrap text-black">₹&nbsp;{grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
               </tr>
             </tfoot>
           </table>
