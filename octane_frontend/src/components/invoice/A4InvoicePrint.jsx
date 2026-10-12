@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Printer, X, Eye, FileText, Maximize2, ZoomIn } from 'lucide-react';
 import { api } from '../../services/api';
 import { useBusinessProfile } from '../../context/BusinessProfileContext';
+import octaneSeal from '../../assets/octane_seal.png';
 
 // Helper function to convert number to Rupees in words
 export const numberToWordsRupees = (amount) => {
@@ -569,11 +570,16 @@ const A4SinglePageCopy = ({ copyType, invoice, company }) => {
           </div>
 
           {/* 10. Signatures Grid */}
-          <div className="grid grid-cols-2 text-black min-h-[52px] items-end p-2">
-            <div className="font-bold text-[11px] text-black">Customer's / Vendor's Seal and Signature</div>
-            <div className="text-right space-y-5">
-              <div className="font-black text-[12px] text-black">for {company.name}</div>
-              <div className="font-bold text-[11px] text-black">Authorised Signatory</div>
+          <div className="grid grid-cols-2 text-black min-h-[68px] items-end p-2 relative">
+            <div className="font-bold text-[11px] text-black pb-1">Customer's / Vendor's Seal and Signature</div>
+            <div className="flex flex-col items-end text-right">
+              <img
+                src={company.seal || octaneSeal}
+                alt="Octane Systems Official Seal"
+                className="h-[68px] w-[68px] object-contain mb-1 mix-blend-multiply"
+              />
+              <div className="font-black text-[12px] text-black leading-tight">for {company.name || 'OCTANE System'}</div>
+              <div className="font-bold text-[11px] text-black pt-1">Authorised Signatory</div>
             </div>
           </div>
         </div>
@@ -671,6 +677,7 @@ export const A4InvoicePrintModal = ({
     bank_account: activeProfile?.account_number || '3149366297',
     bank_ifsc: activeProfile?.ifsc_code || '-VV PURUM & KKBK0008055',
     logo: activeProfile?.logo_url || companyData?.logo || companyData?.logo_url,
+    seal: activeProfile?.seal_url || companyData?.seal || octaneSeal,
     ...companyData,
   };
 
