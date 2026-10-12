@@ -305,7 +305,7 @@ const renderModuleContent = (currentRoute, onNavigate) => {
     case '/masters/payment-methods':
       return <PaymentMethodsMaster />;
     case '/purchases/new':
-      return <NewPurchase />;
+      return <NewPurchase onNavigate={onNavigate} />;
     case '/purchases/history':
       return <PurchaseHistory onSelectRoute={onNavigate} />;
     case '/purchases/payables':

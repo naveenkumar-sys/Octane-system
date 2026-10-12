@@ -11,7 +11,7 @@ import CategoryFormModal from '../../components/forms/CategoryFormModal';
 import BrandFormModal from '../../components/forms/BrandFormModal';
 import A4InvoicePrintModal from '../../components/invoice/A4InvoicePrint';
 
-export const NewPurchase = () => {
+export const NewPurchase = ({ onNavigate }) => {
   const { isAdmin } = useAuth();
 
   const [suppliers, setSuppliers] = useState([]);
@@ -525,20 +525,11 @@ export const NewPurchase = () => {
 
     try {
       const res = await api.createPurchase(payload);
-      const selectedSup = suppliers.find((s) => String(s.id) === String(supplierId));
-      const fullPrintObj = {
-        ...res,
-        is_purchase: true,
-        supplier_name: selectedSup ? selectedSup.name : 'Supplier Vendor',
-        supplier_address: selectedSup ? selectedSup.address : '',
-        supplier_mobile: selectedSup ? selectedSup.mobile : '',
-        supplier_gstin: selectedSup ? selectedSup.gstin : '',
-      };
-      
-      setPrintInvoiceData(fullPrintObj);
-      const msg = `Purchase ${res.purchase_number || 'order'} created successfully! Stock updated.`;
+      const purchaseNum = res.purchase_number || 'entry';
+      const msg = `Purchase ${purchaseNum} saved successfully! Stock and accounts updated.`;
       setSuccessMessage(msg);
       toast.success(msg);
+      setPrintInvoiceData(null); // Never auto-open print modal
       
       // Reset form
       setSupplierId('');
@@ -561,6 +552,8 @@ export const NewPurchase = () => {
           serials: [''],
         },
       ]);
+      // Scroll smoothly to top so user sees the success message
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
       console.error('Failed to create purchase:', err);
       const errMsg = err.message || 'Failed to create purchase.';
@@ -593,19 +586,18 @@ export const NewPurchase = () => {
 
       {/* Notifications */}
       {successMessage && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs font-bold text-emerald-800 flex items-center justify-between gap-3 animate-in fade-in">
+        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs font-bold text-emerald-800 flex flex-wrap items-center justify-between gap-3 animate-in fade-in">
           <div className="flex items-center gap-3">
             <CheckCircle2 size={18} className="text-emerald-600 flex-shrink-0" />
             <span>{successMessage}</span>
           </div>
-          {printInvoiceData && (
+          {onNavigate && (
             <button
               type="button"
-              onClick={() => setPrintInvoiceData(printInvoiceData)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer transition-all flex-shrink-0"
+              onClick={() => onNavigate('/purchases/history')}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer transition-all flex-shrink-0"
             >
-              <Printer size={15} />
-              <span>Print Purchase Invoice (A4)</span>
+              <span>View in Purchase History</span>
             </button>
           )}
         </div>
