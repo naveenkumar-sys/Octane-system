@@ -6,7 +6,7 @@ export default defineConfig({
   fullyParallel: false,
   reporter: 'list',
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: 'http://localhost:8080',
     channel: 'chrome',
     headless: true,
     viewport: { width: 1280, height: 720 },
