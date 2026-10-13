@@ -102,14 +102,7 @@ class PartnerLedgerService:
                         is_this_partner = True
 
                 if is_this_partner:
-                    amt = alloc.get('amount')
-                    if amt is not None:
-                        try:
-                            collections += Decimal(str(amt))
-                        except Exception:
-                            collections += pmt.amount
-                    else:
-                        collections += pmt.amount
+                    collections += pmt.amount
 
         # 2. Fallback for legacy Invoices that have NO records in Payment table
         for inv in Invoice.objects.filter(invoice_status='POSTED').exclude(id__in=invoices_with_payments):
@@ -300,8 +293,7 @@ class PartnerLedgerService:
                         is_this_partner = True
 
                 if is_this_partner:
-                    amt = alloc.get('amount')
-                    dec_amt = Decimal(str(amt)) if amt is not None else pmt.amount
+                    dec_amt = pmt.amount
                     inv_num = pmt.invoice.invoice_number if pmt.invoice else '—'
                     entries.append({
                         'date': pmt.payment_date,
