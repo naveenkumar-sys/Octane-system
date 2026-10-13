@@ -252,6 +252,38 @@ class InvoiceService:
             # Do NOT create payment records for CREDIT and do NOT add CREDIT to total_paid!
             if p_amount > 0 and p_mode != 'CREDIT':
                 p_number = f"PAY-{invoice.invoice_number}-{payment_counter}"
+
+                # Determine payment-specific partner allocation
+                p_partner_alloc = p_data.get('partner_allocation_json')
+                p_payer = p_data.get('payer') or p_data.get('partner_id')
+                
+                if not p_partner_alloc and p_payer and str(p_payer).upper() != 'BUSINESS':
+                    try:
+                        p_partner_obj = Partner.objects.get(id=int(p_payer))
+                        p_partner_alloc = {
+                            'partner_id': p_partner_obj.id,
+                            'partner_name': p_partner_obj.name,
+                            'amount': float(p_amount),
+                            'mode': p_mode
+                        }
+                    except (Partner.DoesNotExist, ValueError):
+                        p_partner_alloc = None
+                elif p_partner_alloc and isinstance(p_partner_alloc, dict):
+                    # Ensure accurate amount and mode for this specific payment record
+                    p_partner_alloc = dict(p_partner_alloc)
+                    p_partner_alloc['amount'] = float(p_amount)
+                    p_partner_alloc['mode'] = p_mode
+                elif not p_partner_alloc and str(p_payer).upper() == 'BUSINESS':
+                    # Explicitly business store till
+                    p_partner_alloc = None
+                elif not p_partner_alloc and not p_payer and len(payments_data) == 1 and payload.get('partner_allocation_json'):
+                    # Fallback for single payment payload with top-level partner_allocation_json
+                    top_alloc = payload.get('partner_allocation_json')
+                    if isinstance(top_alloc, dict):
+                        p_partner_alloc = dict(top_alloc)
+                        p_partner_alloc['amount'] = float(p_amount)
+                        p_partner_alloc['mode'] = p_mode
+
                 Payment.objects.create(
                     payment_number=p_number,
                     invoice=invoice,
@@ -260,11 +292,42 @@ class InvoiceService:
                     payment_mode=p_mode,
                     amount=p_amount,
                     reference_number=p_data.get('reference_number', ''),
-                    partner_allocation_json=payload.get('partner_allocation_json'),
+                    partner_allocation_json=p_partner_alloc,
                     notes=f"Payment for Invoice #{invoice.invoice_number}",
                     created_by=user
                 )
                 payment_counter += 1
+
+        # Consolidate partner allocation summary on the Invoice header
+        partner_payments = invoice.payments.filter(partner_allocation_json__isnull=False)
+        if partner_payments.exists():
+            distinct_partners = set()
+            total_partner_amt = Decimal('0.00')
+            last_partner_info = None
+            for pp in partner_payments:
+                alloc = pp.partner_allocation_json
+                if alloc and isinstance(alloc, dict):
+                    p_id = alloc.get('partner_id')
+                    distinct_partners.add(p_id)
+                    total_partner_amt += pp.amount
+                    last_partner_info = alloc
+            
+            if len(distinct_partners) == 1 and last_partner_info:
+                invoice.partner_allocation_json = {
+                    'partner_id': last_partner_info.get('partner_id'),
+                    'partner_name': last_partner_info.get('partner_name'),
+                    'amount': float(total_partner_amt),
+                    'mode': 'SPLIT' if partner_payments.count() > 1 else last_partner_info.get('mode', 'CASH')
+                }
+            elif len(distinct_partners) > 1:
+                invoice.partner_allocation_json = {
+                    'partner_id': None,
+                    'partner_name': 'Split Across Partners',
+                    'amount': float(total_partner_amt),
+                    'mode': 'SPLIT'
+                }
+        else:
+            invoice.partner_allocation_json = None
 
         # 8. Update Invoice Payment Status via Single Source of Truth
         invoice.recalculate_payment_status()
@@ -357,6 +420,37 @@ class InvoiceService:
                 created_by=user
             )
             recorded_payments.append(payment)
+
+        # Consolidate partner allocation summary on the Invoice header
+        partner_payments = invoice.payments.filter(partner_allocation_json__isnull=False)
+        if partner_payments.exists():
+            distinct_partners = set()
+            total_partner_amt = Decimal('0.00')
+            last_partner_info = None
+            for pp in partner_payments:
+                alloc = pp.partner_allocation_json
+                if alloc and isinstance(alloc, dict):
+                    p_id = alloc.get('partner_id')
+                    distinct_partners.add(p_id)
+                    total_partner_amt += pp.amount
+                    last_partner_info = alloc
+            
+            if len(distinct_partners) == 1 and last_partner_info:
+                invoice.partner_allocation_json = {
+                    'partner_id': last_partner_info.get('partner_id'),
+                    'partner_name': last_partner_info.get('partner_name'),
+                    'amount': float(total_partner_amt),
+                    'mode': 'SPLIT' if partner_payments.count() > 1 else last_partner_info.get('mode', 'CASH')
+                }
+            elif len(distinct_partners) > 1:
+                invoice.partner_allocation_json = {
+                    'partner_id': None,
+                    'partner_name': 'Split Across Partners',
+                    'amount': float(total_partner_amt),
+                    'mode': 'SPLIT'
+                }
+        else:
+            invoice.partner_allocation_json = None
 
         invoice.recalculate_payment_status()
         invoice.save()

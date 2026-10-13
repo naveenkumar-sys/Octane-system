@@ -763,17 +763,28 @@ export const NewPOS = () => {
 
     // Prepare Invoice Payload according to backend CreateInvoiceInputSerializer
     const activePayments = payments.filter((p) => (parseFloat(p.amount) || 0) > 0 && p.payment_mode !== 'CREDIT');
-    const partnerPayment = activePayments.find((p) => p.payer !== 'BUSINESS');
+    const partnerPayments = activePayments.filter((p) => p.payer && p.payer !== 'BUSINESS');
 
     let partnerAllocationJson = null;
-    if (partnerPayment) {
-      const partnerObj = partners.find((pt) => String(pt.id) === String(partnerPayment.payer));
-      partnerAllocationJson = {
-        partner_id: parseInt(partnerPayment.payer, 10),
-        partner_name: partnerObj ? partnerObj.name : 'Partner',
-        amount: parseFloat(partnerPayment.amount),
-        mode: partnerPayment.payment_mode,
-      };
+    if (partnerPayments.length > 0) {
+      const distinctPartnerIds = [...new Set(partnerPayments.map((p) => String(p.payer)))];
+      const totalPartnerAmount = partnerPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+      if (distinctPartnerIds.length === 1) {
+        const partnerObj = partners.find((pt) => String(pt.id) === distinctPartnerIds[0]);
+        partnerAllocationJson = {
+          partner_id: parseInt(distinctPartnerIds[0], 10),
+          partner_name: partnerObj ? partnerObj.name : 'Partner',
+          amount: totalPartnerAmount,
+          mode: partnerPayments.length === 1 ? partnerPayments[0].payment_mode : 'SPLIT',
+        };
+      } else {
+        partnerAllocationJson = {
+          partner_id: null,
+          partner_name: 'Split Across Partners',
+          amount: totalPartnerAmount,
+          mode: 'SPLIT',
+        };
+      }
     }
 
     // Expand cart items into line items payload for backend (Products & Services)
@@ -834,11 +845,22 @@ export const NewPOS = () => {
       invoice_date: new Date().toISOString().split('T')[0],
       mode_of_payment: activePayments.length > 0 ? activePayments[0].payment_mode : 'CASH',
       items: itemsPayload,
-      payments: activePayments.map((p) => ({
-        payment_mode: p.payment_mode,
-        amount: parseFloat(p.amount) || 0,
-        reference_number: p.reference_number || '',
-      })),
+      payments: activePayments.map((p) => {
+        const isPartner = p.payer && p.payer !== 'BUSINESS';
+        const partnerObj = isPartner ? partners.find((pt) => String(pt.id) === String(p.payer)) : null;
+        return {
+          payer: p.payer || 'BUSINESS',
+          payment_mode: p.payment_mode,
+          amount: parseFloat(p.amount) || 0,
+          reference_number: (p.reference_number || '').trim(),
+          partner_allocation_json: isPartner ? {
+            partner_id: parseInt(p.payer, 10),
+            partner_name: partnerObj ? partnerObj.name : 'Partner',
+            amount: parseFloat(p.amount) || 0,
+            mode: p.payment_mode,
+          } : null,
+        };
+      }),
       partner_allocation_json: partnerAllocationJson,
       invoice_type: (!isGstInvoice || (summary.totalTax === 0 && !selectedCustomer?.gstin)) ? 'NON_GST' : 'TAX_INVOICE',
       is_gst: !(!isGstInvoice || (summary.totalTax === 0 && !selectedCustomer?.gstin)),

@@ -1913,10 +1913,10 @@ class FinanceModuleAuditTests(APITestCase):
             company_name="OCTANE SYSTEMS", gstin="29DRTPA7275L1ZW", state_code="29"
         )
         self.partner_ramesh = Partner.objects.create(
-            name="Ramesh", ownership_percentage=Decimal('50.00'), initial_capital=Decimal('50000.00')
+            name="Ramesh", ownership_percentage=Decimal('30.00'), initial_capital=Decimal('50000.00')
         )
         self.partner_lokesh = Partner.objects.create(
-            name="Lokesh", ownership_percentage=Decimal('50.00'), initial_capital=Decimal('50000.00')
+            name="Lokesh", ownership_percentage=Decimal('30.00'), initial_capital=Decimal('50000.00')
         )
         self.category = ExpenseCategory.objects.create(name="Rent & Utilities", is_active=True)
         self.inactive_category = ExpenseCategory.objects.create(name="Old Discontinued", is_active=False)
@@ -2478,7 +2478,7 @@ class FinanceModuleAuditTests(APITestCase):
         self.client.force_authenticate(user=self.admin)
         partner = Partner.objects.create(
             name="Immutability Test Partner",
-            ownership_percentage=Decimal('50.00'),
+            ownership_percentage=Decimal('30.00'),
             initial_capital=Decimal('50000.00'),
             is_active=True
         )
@@ -2493,7 +2493,7 @@ class FinanceModuleAuditTests(APITestCase):
         # Attempt to silently change initial_capital via PUT -> Must fail with 400
         res_put = self.client.put(reverse('partner-detail', args=[partner.id]), {
             'name': 'Immutability Test Partner',
-            'ownership_percentage': '50.00',
+            'ownership_percentage': '30.00',
             'initial_capital': '90000.00',
             'is_active': True
         })
@@ -2565,13 +2565,140 @@ class FinanceModuleAuditTests(APITestCase):
         self.assertEqual(invoice.invoice_status, 'POSTED')
 
         summary = PartnerLedgerService.get_partner_ledger_summary(self.partner_ramesh.id)
-        self.assertEqual(summary['incomes_allocated'], Decimal('29500.00'))
+        self.assertEqual(summary['customer_collections'], Decimal('29500.00'))
 
         statement = PartnerLedgerService.get_chronological_statement(self.partner_ramesh.id)
-        pos_entry = next((e for e in statement if e['reference'] == invoice.invoice_number), None)
+        pos_entry = next((e for e in statement if e['type'] == 'CUSTOMER_COLLECTION'), None)
         self.assertIsNotNone(pos_entry)
-        self.assertEqual(pos_entry['credit'], Decimal('29500.00'))
-        self.assertIn('POS Sale', pos_entry['description'])
+        self.assertEqual(pos_entry['debit'], Decimal('29500.00'))
+
+    def test_pos_split_payment_same_partner_allocation_ledger_integration(self):
+        """
+        Verifies that when a POS sale is split into multiple payments collected by the SAME partner
+        (e.g. ₹40,000 + ₹54,400 to Lokesh), BOTH payments are debited and show in partner statement.
+        """
+        self.client.force_authenticate(user=self.admin)
+        from core.services.invoice_service import InvoiceService
+        StockMovement.objects.create(
+            product=self.product,
+            movement_type='OPENING',
+            quantity=10,
+            created_by=self.admin
+        )
+        inv_payload = {
+            'customer_id': self.customer.id,
+            'buyer_name': self.customer.name,
+            'invoice_date': '2026-10-13',
+            'mode_of_payment': 'CASH',
+            'items': [
+                {
+                    'item_type': 'PRODUCT',
+                    'product_id': self.product.id,
+                    'description': self.product.name,
+                    'qty': 2,
+                    'rate': Decimal('40000.00'),
+                    'gst_rate': Decimal('18.00'),
+                }
+            ],
+            'payments': [
+                {
+                    'payer': str(self.partner_lokesh.id),
+                    'payment_mode': 'CASH',
+                    'amount': Decimal('40000.00'),
+                    'partner_allocation_json': {
+                        'partner_id': self.partner_lokesh.id,
+                        'partner_name': self.partner_lokesh.name,
+                        'amount': 40000.00,
+                        'mode': 'CASH'
+                    }
+                },
+                {
+                    'payer': str(self.partner_lokesh.id),
+                    'payment_mode': 'CASH',
+                    'amount': Decimal('54400.00'),
+                    'partner_allocation_json': {
+                        'partner_id': self.partner_lokesh.id,
+                        'partner_name': self.partner_lokesh.name,
+                        'amount': 54400.00,
+                        'mode': 'CASH'
+                    }
+                }
+            ]
+        }
+        invoice = InvoiceService.create_and_post_invoice(user=self.admin, payload=inv_payload)
+        self.assertEqual(invoice.invoice_status, 'POSTED')
+        self.assertEqual(invoice.payments.count(), 2)
+
+        summary = PartnerLedgerService.get_partner_ledger_summary(self.partner_lokesh.id)
+        # Total collections must be 40,000 + 54,400 = 94,400
+        self.assertEqual(summary['customer_collections'], Decimal('94400.00'))
+
+        statement = PartnerLedgerService.get_chronological_statement(self.partner_lokesh.id)
+        collection_entries = [e for e in statement if e['type'] == 'CUSTOMER_COLLECTION']
+        self.assertEqual(len(collection_entries), 2)
+        debit_amounts = {e['debit'] for e in collection_entries}
+        self.assertIn(Decimal('40000.00'), debit_amounts)
+        self.assertIn(Decimal('54400.00'), debit_amounts)
+
+    def test_pos_split_payment_business_and_partner_ledger_integration(self):
+        """
+        Verifies that when a POS sale is split between Store Till and a Partner
+        (e.g. ₹40,000 to Store Till, ₹54,400 to Lokesh), ONLY the partner's share is debited.
+        """
+        self.client.force_authenticate(user=self.admin)
+        from core.services.invoice_service import InvoiceService
+        StockMovement.objects.create(
+            product=self.product,
+            movement_type='OPENING',
+            quantity=10,
+            created_by=self.admin
+        )
+        inv_payload = {
+            'customer_id': self.customer.id,
+            'buyer_name': self.customer.name,
+            'invoice_date': '2026-10-13',
+            'mode_of_payment': 'CASH',
+            'items': [
+                {
+                    'item_type': 'PRODUCT',
+                    'product_id': self.product.id,
+                    'description': self.product.name,
+                    'qty': 2,
+                    'rate': Decimal('40000.00'),
+                    'gst_rate': Decimal('18.00'),
+                }
+            ],
+            'payments': [
+                {
+                    'payer': 'BUSINESS',
+                    'payment_mode': 'CASH',
+                    'amount': Decimal('40000.00'),
+                    'partner_allocation_json': None
+                },
+                {
+                    'payer': str(self.partner_lokesh.id),
+                    'payment_mode': 'CASH',
+                    'amount': Decimal('54400.00'),
+                    'partner_allocation_json': {
+                        'partner_id': self.partner_lokesh.id,
+                        'partner_name': self.partner_lokesh.name,
+                        'amount': 54400.00,
+                        'mode': 'CASH'
+                    }
+                }
+            ]
+        }
+        invoice = InvoiceService.create_and_post_invoice(user=self.admin, payload=inv_payload)
+        self.assertEqual(invoice.invoice_status, 'POSTED')
+
+        summary = PartnerLedgerService.get_partner_ledger_summary(self.partner_lokesh.id)
+        # Only the 54,400 payment collected by Lokesh is debited
+        self.assertEqual(summary['customer_collections'], Decimal('54400.00'))
+
+        statement = PartnerLedgerService.get_chronological_statement(self.partner_lokesh.id)
+        collection_entries = [e for e in statement if e['type'] == 'CUSTOMER_COLLECTION']
+        self.assertEqual(len(collection_entries), 1)
+        self.assertEqual(collection_entries[0]['debit'], Decimal('54400.00'))
 
 
 

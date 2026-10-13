@@ -85,13 +85,36 @@ class PartnerLedgerService:
         A collection is an implicit drawing / liability (DEBIT) until deposited back to the business.
         """
         collections = Decimal('0.00')
-        invoices_processed = set()
+        invoices_with_payments = set(Payment.objects.values_list('invoice_id', flat=True))
 
-        # Check posted Invoices with partner_allocation_json
-        for inv in Invoice.objects.filter(invoice_status='POSTED'):
+        # 1. Primary Source of Truth: Payment records (accurately handles split payments)
+        for pmt in Payment.objects.filter(partner_allocation_json__isnull=False).select_related('invoice'):
+            if pmt.invoice and pmt.invoice.invoice_status == 'CANCELLED':
+                continue
+            alloc = pmt.partner_allocation_json
+            if alloc and isinstance(alloc, dict):
+                is_this_partner = False
+                if alloc.get('partner_id') == partner.id or alloc.get('partner_name') == partner.name:
+                    is_this_partner = True
+                else:
+                    val = alloc.get(partner.name) or alloc.get(str(partner.id)) or alloc.get(str(partner.name).capitalize())
+                    if val is not None:
+                        is_this_partner = True
+
+                if is_this_partner:
+                    amt = alloc.get('amount')
+                    if amt is not None:
+                        try:
+                            collections += Decimal(str(amt))
+                        except Exception:
+                            collections += pmt.amount
+                    else:
+                        collections += pmt.amount
+
+        # 2. Fallback for legacy Invoices that have NO records in Payment table
+        for inv in Invoice.objects.filter(invoice_status='POSTED').exclude(id__in=invoices_with_payments):
             alloc = getattr(inv, 'partner_allocation_json', None)
             if alloc and isinstance(alloc, dict):
-                invoices_processed.add(inv.id)
                 if alloc.get('partner_id') == partner.id or alloc.get('partner_name') == partner.name:
                     amt = alloc.get('amount')
                     if amt:
@@ -108,27 +131,6 @@ class PartnerLedgerService:
                                 collections += (inv.grand_total * val_dec) / Decimal('100')
                             else:
                                 collections += val_dec
-                        except Exception:
-                            pass
-
-        # Check Payments with partner_allocation_json
-        for pmt in Payment.objects.filter(partner_allocation_json__isnull=False):
-            if pmt.invoice_id and pmt.invoice_id in invoices_processed:
-                continue
-            alloc = pmt.partner_allocation_json
-            if alloc and isinstance(alloc, dict):
-                if alloc.get('partner_id') == partner.id or alloc.get('partner_name') == partner.name:
-                    amt = alloc.get('amount')
-                    if amt:
-                        try:
-                            collections += Decimal(str(amt))
-                        except Exception:
-                            pass
-                else:
-                    val = alloc.get(partner.name) or alloc.get(str(partner.id))
-                    if val is not None:
-                        try:
-                            collections += Decimal(str(val))
                         except Exception:
                             pass
 
@@ -281,11 +283,40 @@ class PartnerLedgerService:
                         pass
 
         # 3. Customer Payments Collected & Held by Partner (DEBIT)
-        invoices_processed = set()
-        for inv in Invoice.objects.filter(invoice_status='POSTED'):
+        invoices_with_payments = set(Payment.objects.values_list('invoice_id', flat=True))
+
+        # 3a. Primary Source of Truth: Payment records (accurately handles each split payment)
+        for pmt in Payment.objects.filter(partner_allocation_json__isnull=False).select_related('invoice'):
+            if pmt.invoice and pmt.invoice.invoice_status == 'CANCELLED':
+                continue
+            alloc = pmt.partner_allocation_json
+            if alloc and isinstance(alloc, dict):
+                is_this_partner = False
+                if alloc.get('partner_id') == partner.id or alloc.get('partner_name') == partner.name:
+                    is_this_partner = True
+                else:
+                    val = alloc.get(partner.name) or alloc.get(str(partner.id)) or alloc.get(str(partner.name).capitalize())
+                    if val is not None:
+                        is_this_partner = True
+
+                if is_this_partner:
+                    amt = alloc.get('amount')
+                    dec_amt = Decimal(str(amt)) if amt is not None else pmt.amount
+                    inv_num = pmt.invoice.invoice_number if pmt.invoice else '—'
+                    entries.append({
+                        'date': pmt.payment_date,
+                        'created_at': pmt.created_at,
+                        'type': 'CUSTOMER_COLLECTION',
+                        'reference': pmt.payment_number,
+                        'description': f"Customer payment collected & held by {partner.name} (#{pmt.payment_number} for #{inv_num} - {pmt.payment_mode})",
+                        'credit': Decimal('0.00'),
+                        'debit': dec_amt
+                    })
+
+        # 3b. Fallback for legacy Invoices without Payment objects
+        for inv in Invoice.objects.filter(invoice_status='POSTED').exclude(id__in=invoices_with_payments):
             alloc = getattr(inv, 'partner_allocation_json', None)
             if alloc and isinstance(alloc, dict):
-                invoices_processed.add(inv.id)
                 if alloc.get('partner_id') == partner.id or alloc.get('partner_name') == partner.name:
                     amt = alloc.get('amount')
                     if amt:
@@ -302,7 +333,7 @@ class PartnerLedgerService:
                         except Exception:
                             pass
                 else:
-                    val = alloc.get(partner.name) or alloc.get(str(partner.id))
+                    val = alloc.get(partner.name) or alloc.get(str(partner.id)) or alloc.get(str(partner.name).capitalize())
                     if val is not None:
                         try:
                             val_dec = Decimal(str(val))
@@ -315,27 +346,6 @@ class PartnerLedgerService:
                                 'description': f"Customer collection retained by {partner.name} (#{inv.invoice_number})",
                                 'credit': Decimal('0.00'),
                                 'debit': share_amt
-                            })
-                        except Exception:
-                            pass
-
-        for pmt in Payment.objects.filter(partner_allocation_json__isnull=False):
-            if pmt.invoice_id and pmt.invoice_id in invoices_processed:
-                continue
-            alloc = pmt.partner_allocation_json
-            if alloc and isinstance(alloc, dict):
-                if alloc.get('partner_id') == partner.id or alloc.get('partner_name') == partner.name:
-                    amt = alloc.get('amount')
-                    if amt:
-                        try:
-                            entries.append({
-                                'date': pmt.payment_date,
-                                'created_at': pmt.created_at,
-                                'type': 'CUSTOMER_COLLECTION',
-                                'reference': pmt.payment_number,
-                                'description': f"Customer payment received & held by {partner.name} (#{pmt.payment_number})",
-                                'credit': Decimal('0.00'),
-                                'debit': Decimal(str(amt))
                             })
                         except Exception:
                             pass

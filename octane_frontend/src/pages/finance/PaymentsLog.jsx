@@ -340,10 +340,17 @@ const PaymentsLog = () => {
                       <div className="flex items-center gap-2">
                         <FileText className="w-4 h-4 text-slate-400 shrink-0" />
                         <div>
-                          <div className="font-bold text-slate-900">{p.reference_number || `PAY-${p.id}`}</div>
-                          {p.related_doc && (
-                            <div className="text-[11px] text-orange-600 font-mono font-medium">{p.related_doc}</div>
-                          )}
+                          <div className="font-bold text-slate-900 font-mono">
+                            {p.txn_number || (p.reference_number && p.reference_number !== '—' ? p.reference_number : `PAY-${p.id}`)}
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {p.related_doc && p.related_doc !== '—' && (
+                              <div className="text-[11px] text-orange-600 font-mono font-medium">{p.related_doc}</div>
+                            )}
+                            {p.reference_number && p.reference_number !== '—' && p.reference_number !== p.txn_number && (
+                              <div className="text-[10px] text-slate-400 font-mono">Ref: {p.reference_number}</div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </td>
