@@ -304,6 +304,7 @@ const PnlReport = () => {
                     <div>
                       <span className="font-semibold text-slate-700">Total Sales Value</span>
                       <span className="ml-1.5 text-[10px] text-slate-400">(Before GST)</span>
+                      <p className="text-[10px] text-slate-400">Total amount billed to customers</p>
                     </div>
                     <span className="font-mono font-semibold text-slate-800">
                       {fmt(report.gross_sales_taxable ?? report.sales_taxable_revenue)}
@@ -312,8 +313,12 @@ const PnlReport = () => {
 
                   <div className="flex justify-between items-center text-rose-600 pl-3 border-l-2 border-rose-200">
                     <div>
-                      <span>Minus: Customer Returns</span>
-                      <span className="ml-1.5 text-[10px] text-rose-400">(Refunded items)</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-rose-100 text-rose-700 font-mono">− Minus</span>
+                        <span className="font-semibold">Customer Returns</span>
+                        <span className="text-[10px] text-rose-400 font-normal">(Refunded items)</span>
+                      </div>
+                      <p className="text-[10px] text-rose-500 mt-0.5">Refunded money deducted from sales</p>
                     </div>
                     <span className="font-mono font-bold">
                       − {fmt(report.sales_returns_taxable || 0)}
@@ -322,8 +327,11 @@ const PnlReport = () => {
 
                   <div className="flex justify-between items-center pt-2 border-t border-slate-200 font-extrabold text-slate-900 text-sm">
                     <div>
-                      <span className="text-blue-900">Net Sales Income</span>
-                      <p className="text-[10.5px] text-slate-500 font-normal">Real revenue earned from sales</p>
+                      <div className="flex items-center gap-1.5">
+                        <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-blue-100 text-blue-700 font-mono">= Result</span>
+                        <span className="text-blue-900">Net Sales Income</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 font-normal mt-0.5">Real sales earned (Sales − Returns)</p>
                     </div>
                     <span className="font-mono text-blue-700 text-base">
                       {fmt(report.net_sales_revenue ?? report.sales_taxable_revenue)}
@@ -364,37 +372,73 @@ const PnlReport = () => {
 
               <div className="p-4 space-y-2.5 text-xs font-mono">
                 <div className="flex justify-between items-center text-slate-700 font-sans">
-                  <span>Starting Stock Value (Beginning of period)</span>
+                  <div>
+                    <span className="font-semibold">Starting Stock Value</span>
+                    <span className="ml-1.5 text-[10px] text-slate-400">(Beginning of period)</span>
+                    <p className="text-[10px] text-slate-400">Stock on shelves at start of period</p>
+                  </div>
                   <span className="font-mono font-semibold">{fmt(report.opening_inventory || 0)}</span>
                 </div>
 
                 <div className="flex justify-between items-center text-slate-700 font-sans pl-3 border-l-2 border-emerald-300">
                   <div>
-                    <span>Plus: New Purchases Received (Stock added)</span>
-                    <span className="ml-1.5 text-[10px] text-slate-400 font-mono">(Before GST)</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-emerald-100 text-emerald-700 font-mono">+ Plus</span>
+                      <span className="font-semibold">New Purchases Received</span>
+                      <span className="text-[10px] text-slate-400 font-mono">(Before GST)</span>
+                    </div>
+                    <p className="text-[10px] text-emerald-600 mt-0.5 font-sans">New stock added to shop from suppliers</p>
                   </div>
                   <span className="font-mono font-semibold text-emerald-700">+ {fmt(report.purchases_taxable || 0)}</span>
                 </div>
 
                 <div className="flex justify-between items-center text-slate-700 font-sans pl-3 border-l-2 border-rose-300">
-                  <span>Minus: Goods Returned to Suppliers</span>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-rose-100 text-rose-700 font-mono">− Minus</span>
+                      <span className="font-semibold">Goods Returned to Suppliers</span>
+                    </div>
+                    <p className="text-[10px] text-rose-500 mt-0.5 font-sans">Defective stock sent back to suppliers</p>
+                  </div>
                   <span className="font-mono font-semibold text-rose-600">− {fmt(report.purchase_returns_taxable || 0)}</span>
                 </div>
 
                 <div className="flex justify-between items-center pt-1.5 border-t border-slate-200 text-slate-800 font-bold font-sans">
-                  <span>Total Stock Handled (Starting + Purchases)</span>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-slate-100 text-slate-700 font-mono">= Total</span>
+                      <span>Total Stock Handled</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 font-normal mt-0.5">Total stock available to sell (Starting Stock + Purchases)</p>
+                  </div>
                   <span className="font-mono">{fmt(report.goods_available_for_sale || 0)}</span>
                 </div>
 
                 <div className="flex justify-between items-center text-slate-700 font-sans pl-3 border-l-2 border-blue-300">
-                  <span>Minus: Unsold Stock Still in Shop (Closing stock)</span>
-                  <span className="font-mono font-semibold text-blue-700">− {fmt(report.closing_inventory || 0)}</span>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-blue-100 text-blue-700 font-mono">− Minus</span>
+                      <span className="font-semibold">Unsold Stock Still in Shop</span>
+                      <span className="text-[10px] text-blue-400 font-normal">(Closing stock)</span>
+                    </div>
+                    <p className="text-[10px] text-blue-600 mt-0.5 font-sans">Stock still on shelves (asset, not an expense yet)</p>
+                  </div>
+                  <span className="font-mono font-semibold text-blue-700">
+                    − {fmt(
+                      report.goods_available_for_sale && report.cost_of_goods_sold
+                        ? Math.max(0, report.goods_available_for_sale - report.cost_of_goods_sold)
+                        : (report.closing_inventory || 0)
+                    )}
+                  </span>
                 </div>
 
                 <div className="flex justify-between items-center pt-2 border-t border-slate-200 font-extrabold text-slate-900 text-sm font-sans">
                   <div>
-                    <span className="text-rose-900">Cost of Items Actually Sold (Before GST)</span>
-                    <p className="text-[10.5px] text-slate-500 font-normal">Pre-tax base purchase cost of sold items (without GST)</p>
+                    <div className="flex items-center gap-1.5">
+                      <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-rose-100 text-rose-700 font-mono">− Deduct</span>
+                      <span className="text-rose-900">Cost of Items Actually Sold (Before GST)</span>
+                    </div>
+                    <p className="text-[10.5px] text-slate-500 font-normal mt-0.5">Purchase cost of sold items (deducted from sales to find profit)</p>
                   </div>
                   <span className="font-mono text-rose-600 text-base">− {fmt(report.cost_of_goods_sold)}</span>
                 </div>
@@ -402,13 +446,20 @@ const PnlReport = () => {
                 {/* Purchase Tax Note */}
                 <div className="pt-2 border-t border-dashed border-slate-200 space-y-1.5 text-[11px] text-slate-500 font-sans">
                   <div className="flex justify-between items-center">
-                    <span>Total Purchase Bills Paid to Suppliers (With GST):</span>
+                    <div>
+                      <span>Total Purchase Bills Paid to Suppliers:</span>
+                      <span className="ml-1 text-[10px] text-slate-400">(With GST)</span>
+                    </div>
                     <span className="font-mono font-bold text-slate-700">
                       {fmt(report.purchases_gross || ((report.purchases_taxable || 0) + (report.purchases_gst || report.input_gst || 0)))}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span>GST Input Tax Credit Claimed (ITC):</span>
+                    <div>
+                      <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-emerald-100 text-emerald-700 font-mono mr-1">− Claim</span>
+                      <span>GST Input Tax Credit Claimed (ITC):</span>
+                      <p className="text-[9.5px] text-emerald-600 font-normal">GST claimed back from Govt (reduces your purchase cost)</p>
+                    </div>
                     <span className="font-mono font-bold text-emerald-700">
                       − {fmt(report.purchases_gst ?? report.input_gst ?? 0)}
                     </span>
@@ -498,11 +549,23 @@ const PnlReport = () => {
 
               <div className="space-y-2.5 text-xs">
                 <div className="flex justify-between items-center text-slate-600">
-                  <span>GST Collected from Customers (Output Tax):</span>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-blue-100 text-blue-700 font-mono">+ Tax</span>
+                      <span>GST Collected from Customers (Output Tax):</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Tax collected for government</p>
+                  </div>
                   <span className="font-mono font-bold text-slate-800">+{fmt(report.output_gst || report.net_output_gst || 0)}</span>
                 </div>
                 <div className="flex justify-between items-center text-slate-600">
-                  <span>Minus: GST Paid on Purchases (Input Credit):</span>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-emerald-100 text-emerald-700 font-mono">− Credit</span>
+                      <span>Minus: GST Paid on Purchases (Input Credit):</span>
+                    </div>
+                    <p className="text-[10px] text-emerald-600 mt-0.5">Tax already paid to suppliers that you deduct</p>
+                  </div>
                   <span className="font-mono font-bold text-emerald-700">− {fmt(report.input_gst || 0)}</span>
                 </div>
 
