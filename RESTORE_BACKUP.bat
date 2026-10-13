@@ -38,7 +38,7 @@ docker compose up -d db >nul 2>&1
 
 set /a DB_WAIT=0
 :wait_db_ready
-docker compose exec -T db pg_isready -U octane_user >nul 2>&1
+docker compose exec -T db pg_isready -U octane_user <nul >nul 2>&1
 if %errorlevel% equ 0 goto db_ready
 ping 127.0.0.1 -n 2 >nul
 set /a DB_WAIT+=1
@@ -60,7 +60,7 @@ for /f "delims=" %%d in ('powershell -Command "Get-Date -format 'dddd, MMMM dd, 
 
 set "SAFETY_BACKUP=backups\safety\safety_backup_before_restore_%CURRENT_DATE_STR%.sql"
 
-docker compose exec -T db pg_dump -U octane_user --clean --if-exists octane_systems > "%SAFETY_BACKUP%" 2>nul
+docker compose exec -T db pg_dump -U octane_user --clean --if-exists octane_systems <nul > "%SAFETY_BACKUP%" 2>nul
 set "safety_size=0"
 if exist "%SAFETY_BACKUP%" (
     for %%F in ("%SAFETY_BACKUP%") do set "safety_size=%%~zF"
@@ -80,13 +80,14 @@ echo.
 :: -------------------------------------------------------------
 :: STEP 2: LIST AVAILABLE BACKUPS FOR SELECTION
 :: -------------------------------------------------------------
-echo [*] STEP 2: Available Backups in 'backups' folder:
+echo [*] STEP 2: Available Backups:
 echo ========================================================
 
 set /a count=0
 for /f "delims=" %%F in ('dir /b /o-d /a:-d "backups\*.sql" 2^>nul') do (
     set /a count+=1
     set "file_!count!=%%F"
+    set "filepath_!count!=backups\%%F"
     if !count! equ 1 (
         echo   [!count!] %%F   ^<-- [LATEST BACKUP]
     ) else (
@@ -94,7 +95,24 @@ for /f "delims=" %%F in ('dir /b /o-d /a:-d "backups\*.sql" 2^>nul') do (
     )
 )
 
-if !count! equ 0 (
+set /a scount=0
+for /f "delims=" %%S in ('dir /b /o-d /a:-d "backups\safety\*.sql" 2^>nul') do (
+    set /a scount+=1
+    set "sfile_!scount!=%%S"
+    set "sfilepath_!scount!=backups\safety\%%S"
+)
+
+if !scount! gtr 0 (
+    echo.
+    echo   --- Pre-Restore Safety Backups [Undo Snapshots] ---
+    for /L %%i in (1,1,!scount!) do (
+        if %%i leq 5 (
+            echo   [S%%i] !sfile_%%i!
+        )
+    )
+)
+
+if !count! equ 0 if !scount! equ 0 (
     echo.
     color 0C
     echo [ERROR] No backup SQL files found in backups folder!
@@ -105,23 +123,40 @@ if !count! equ 0 (
 
 echo ========================================================
 echo.
-echo   Press ENTER to restore [1] (Latest Backup), or type a number.
+echo   Press ENTER to restore [1] (Latest Backup), or type a number (e.g. 2, or S1 to Undo).
 echo.
 set "choice=1"
 set /p choice="Enter backup number to restore [Default 1]: "
+if "!choice!"=="" set "choice=1"
+set "choice=!choice: =!"
+if "!choice!"=="" set "choice=1"
 
-set "selected_file=!file_%choice%!"
+set "first_char=!choice:~0,1!"
+if /i "!first_char!"=="S" (
+    set "snum=!choice:~1!"
+    if "!snum!"=="" set "snum=1"
+    for %%V in (!snum!) do (
+        set "selected_file=!sfile_%%V!"
+        set "selected_path=!sfilepath_%%V!"
+    )
+) else (
+    for %%V in (!choice!) do (
+        set "selected_file=!file_%%V!"
+        set "selected_path=!filepath_%%V!"
+    )
+)
+
 if not defined selected_file (
     echo.
     color 0C
-    echo [ERROR] Invalid selection number "!choice!".
+    echo [ERROR] Invalid selection "!choice!".
     echo.
     pause
     exit /b 1
 )
 
 echo.
-echo Selected backup: backups\!selected_file!
+echo Selected backup: !selected_path!
 echo.
 set "confirm=Y"
 set /p confirm="Confirm restore? Existing data will be replaced by this backup (Y/N) [Default Y]: "
@@ -138,12 +173,12 @@ if /i "!confirm!" neq "Y" (
 :: -------------------------------------------------------------
 echo.
 echo [*] STEP 3: Preparing clean database instance...
-docker compose exec -T db psql -U octane_user -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'octane_systems' AND pid <> pg_backend_pid();" >nul 2>&1
-docker compose exec -T db psql -U octane_user -d postgres -c "DROP DATABASE IF EXISTS octane_systems;" >nul 2>&1
-docker compose exec -T db psql -U octane_user -d postgres -c "CREATE DATABASE octane_systems OWNER octane_user;" >nul 2>&1
+docker compose exec -T db psql -U octane_user -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'octane_systems' AND pid <> pg_backend_pid();" <nul >nul 2>&1
+docker compose exec -T db psql -U octane_user -d postgres -c "DROP DATABASE IF EXISTS octane_systems;" <nul >nul 2>&1
+docker compose exec -T db psql -U octane_user -d postgres -c "CREATE DATABASE octane_systems OWNER octane_user;" <nul >nul 2>&1
 
-echo [*] Restoring database from: backups\!selected_file!...
-docker compose exec -T db psql -U octane_user -d octane_systems < "backups\!selected_file!" >nul 2>&1
+echo [*] Restoring database from: !selected_path!...
+docker compose exec -T db psql -U octane_user -d octane_systems < "!selected_path!" >nul 2>&1
 
 if %errorlevel% neq 0 (
     color 0C
@@ -191,7 +226,7 @@ echo [+] System confirmed ONLINE (HTTP 200 OK)!
 echo.
 echo ========================================================
 echo  [SUCCESS] Database restored successfully!
-echo  Restored from: backups\!selected_file!
+echo  Restored from: !selected_path!
 echo  System URL:    http://localhost:%APP_PORT%
 echo ========================================================
 echo.
