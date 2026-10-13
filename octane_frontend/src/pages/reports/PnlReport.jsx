@@ -90,6 +90,17 @@ const PnlReport = () => {
   const isProfit = report && report.net_profit >= 0;
   const isGrossProfit = report && report.gross_profit >= 0;
 
+  // Store Cash In-Hand (Till Drawer + Store Bank - exactly matches Payments Log)
+  const storeInflow = report
+    ? (Number(report.store_customer_receipts ?? report.total_customer_receipts ?? 0) + Number(report.partner_deposits_to_store ?? 0))
+    : 0;
+  const storeOutflow = report
+    ? (Number(report.total_supplier_payouts ?? 0) + Number(report.total_operating_cash_expenses ?? 0) + Number(report.total_partner_drawings ?? 0))
+    : 0;
+  const storeCashInHand = report?.store_net_cash_flow !== undefined
+    ? report.store_net_cash_flow
+    : (storeInflow - storeOutflow);
+
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-16">
       {/* Top Banner Header */}
@@ -234,18 +245,18 @@ const PnlReport = () => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
                     <Wallet size={15} className="text-purple-600" />
-                    <span className="font-extrabold text-purple-950">Net Cash In-Hand (Liquidity)</span>
+                    <span className="font-extrabold text-purple-950">Store Cash In-Hand (Liquidity)</span>
                   </div>
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 border border-purple-200">Includes GST</span>
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 border border-purple-200">Till &amp; Bank</span>
                 </div>
-                <div className="text-xl font-extrabold text-purple-700 font-mono">
-                  {fmt(report.net_cash_flow ?? (report.total_customer_receipts - (report.total_supplier_payouts + report.total_operating_cash_expenses + (report.total_partner_drawings || 0))))}
+                <div className={`text-xl font-extrabold font-mono ${storeCashInHand >= 0 ? 'text-purple-700' : 'text-rose-600'}`}>
+                  {fmt(storeCashInHand)}
                 </div>
                 <p className="text-[11px] text-slate-600 leading-relaxed">
-                  <strong>Actual money in bank &amp; cash till.</strong> This includes GST because customers pay full bill amounts, and you pay suppliers full bill amounts.
+                  <strong>Actual money in bank &amp; cash till.</strong> Physical cash in till &amp; company bank balance (matches Payments Log).
                 </p>
                 <div className="text-[10px] text-purple-800 font-mono bg-purple-50/80 p-2 rounded-lg border border-purple-100">
-                  Received ({fmt(report.total_customer_receipts)}) − Paid Out ({fmt(report.total_supplier_payouts + report.total_operating_cash_expenses + (report.total_partner_drawings || 0))})
+                  Store Inflow ({fmt(storeInflow)}) − Store Outflow ({fmt(storeOutflow)})
                 </div>
               </div>
 
@@ -538,9 +549,15 @@ const PnlReport = () => {
 
               <div className="space-y-2.5 text-xs">
                 <div className="flex justify-between items-center text-slate-600">
-                  <span>+ Money Received from Customers:</span>
-                  <span className="font-mono font-bold text-emerald-700">+{fmt(report.total_customer_receipts || 0)}</span>
+                  <span>+ Customer Payments Received at Store Till:</span>
+                  <span className="font-mono font-bold text-emerald-700">+{fmt(report.store_customer_receipts ?? report.total_customer_receipts ?? 0)}</span>
                 </div>
+                {(report.partner_deposits_to_store || 0) > 0 && (
+                  <div className="flex justify-between items-center text-slate-600">
+                    <span>+ Partner Cash Handed Over / Deposited to Store:</span>
+                    <span className="font-mono font-bold text-emerald-700">+{fmt(report.partner_deposits_to_store || 0)}</span>
+                  </div>
+                )}
                 <div className="space-y-1">
                   <div className="flex justify-between items-center text-slate-600">
                     <span>− Money Paid to Suppliers (From Shop Till &amp; Bank):</span>
@@ -578,28 +595,28 @@ const PnlReport = () => {
                   </div>
                 )}
 
-                <div className={`p-3 rounded-xl border space-y-1 ${(report.net_cash_flow || 0) >= 0 ? 'bg-purple-50 border-purple-200' : 'bg-slate-50 border-slate-200'}`}>
+                <div className={`p-3 rounded-xl border space-y-1 ${storeCashInHand >= 0 ? 'bg-purple-50 border-purple-200' : 'bg-rose-50 border-rose-200'}`}>
                   <div className="flex justify-between items-center font-extrabold text-slate-900">
                     <span>
-                      {(report.net_cash_flow || 0) >= 0
-                        ? 'Net Cash Inflow (Surplus):'
-                        : 'Net Cash Outflow (Deficit):'
+                      {storeCashInHand >= 0
+                        ? 'Store Cash In-Hand (Till & Bank Surplus):'
+                        : 'Store Cash Deficit (Till & Bank Negative):'
                       }
                     </span>
-                    <span className={`font-mono text-base ${(report.net_cash_flow || 0) >= 0 ? 'text-purple-700' : 'text-amber-700'}`}>
-                      {fmt(report.net_cash_flow || 0)}
+                    <span className={`font-mono text-base ${storeCashInHand >= 0 ? 'text-purple-700' : 'text-rose-700'}`}>
+                      {fmt(storeCashInHand)}
                     </span>
                   </div>
                   <p className="text-[10px] text-slate-500 font-medium">
-                    {(report.net_cash_flow || 0) >= 0
-                      ? 'More money came into bank & till than went out during this period.'
-                      : 'More money went out for stock and bills than came in from customers this period.'
+                    {storeCashInHand >= 0
+                      ? 'Physical cash in till & company bank balance (matches Payments Log).'
+                      : 'More money went out from shop drawer & bank than came in during this period.'
                     }
                   </p>
                 </div>
 
                 <p className="text-[10.5px] text-slate-500 italic leading-relaxed pt-1">
-                  * Note: Cash flow measures real money moving in-and-out of bank and cash till. It is different from profit because buying stock and clearing supplier dues uses cash immediately.
+                  * Note: Cash flow measures real money moving in-and-out of bank and cash till. It matches the Monetary Payments Audit Log.
                 </p>
               </div>
             </div>
