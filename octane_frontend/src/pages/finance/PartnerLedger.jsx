@@ -475,9 +475,18 @@ export const PartnerLedger = () => {
       render: (row) => {
         const bal = parseFloat(row.running_balance || 0);
         return (
-          <span className={`font-mono font-extrabold text-xs ${bal >= 0 ? 'text-slate-900' : 'text-rose-700'}`}>
-            ₹{bal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-          </span>
+          <div>
+            <span className={`font-mono font-extrabold text-xs ${bal >= 0 ? 'text-slate-900' : 'text-rose-700'}`}>
+              ₹{bal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            </span>
+            <div className="text-[9.5px] font-bold font-sans mt-0.5">
+              {bal >= 0 ? (
+                <span className="text-emerald-700">Company Owes</span>
+              ) : (
+                <span className="text-rose-600">Partner Owes</span>
+              )}
+            </div>
+          </div>
         );
       },
     },
@@ -573,6 +582,17 @@ export const PartnerLedger = () => {
               <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Net Capital Balance</div>
               <div className={`text-2xl font-extrabold font-mono ${parseFloat(ledgerSummary.net_capital_balance || 0) >= 0 ? 'text-indigo-700' : 'text-rose-600'}`}>
                 ₹{parseFloat(ledgerSummary.net_capital_balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </div>
+              <div className="text-[11px] font-bold mt-1">
+                {parseFloat(ledgerSummary.net_capital_balance || 0) >= 0 ? (
+                  <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                    🏢 Company owes {ledgerSummary.partner_name}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200">
+                    👤 {ledgerSummary.partner_name} owes Company
+                  </span>
+                )}
               </div>
             </div>
           </div>
