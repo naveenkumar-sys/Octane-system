@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Printer, X, Eye, FileText, Maximize2, ZoomIn } from 'lucide-react';
 import { api } from '../../services/api';
 import { useBusinessProfile } from '../../context/BusinessProfileContext';
+import octaneLogo from '../../assets/octane_logo.png';
 import octaneSeal from '../../assets/octane_seal.png';
 
 // Helper function to convert number to Rupees in words
@@ -211,12 +212,16 @@ const A4SinglePageCopy = ({ copyType, invoice, company }) => {
             {!isPurchase ? (
               // Sales: Seller = Company
               <div className="p-2.5 space-y-0.5 text-black">
-                {company.logo && (
-                  <div className="pb-1">
-                    <img src={company.logo} alt="Company Logo" className="h-9 max-w-[130px] object-contain" />
+                <div className="flex items-center gap-2.5 pb-1">
+                  <img
+                    src={octaneLogo}
+                    alt="Octane Systems Official Logo"
+                    className="h-10 w-10 object-contain shrink-0"
+                  />
+                  <div className="font-black text-[14px] uppercase tracking-wide leading-tight text-black">
+                    {company.name || 'OCTANE SYSTEM'}
                   </div>
-                )}
-                <div className="font-black text-[13.5px] uppercase leading-tight text-black">{company.name}</div>
+                </div>
                 <div className="text-[11.5px] leading-snug font-semibold text-black">{company.address_line1}</div>
                 {company.address_line2 && <div className="text-[11.5px] font-semibold text-black">{company.address_line2}</div>}
                 <div className="text-[11.5px] font-semibold text-black">{company.city_pincode}</div>
@@ -252,12 +257,16 @@ const A4SinglePageCopy = ({ copyType, invoice, company }) => {
               // Purchase: Buyer = Company (Store / Recipient)
               <div className="border-t-[1.5px] border-black p-2.5 space-y-0.5 text-black">
                 <div className="text-[10.5px] font-bold text-black uppercase">Recipient / Buyer (Store)</div>
-                {company.logo && (
-                  <div className="pb-1">
-                    <img src={company.logo} alt="Company Logo" className="h-8 max-w-[110px] object-contain" />
+                <div className="flex items-center gap-2 pb-0.5">
+                  <img
+                    src={octaneLogo}
+                    alt="Octane Systems Official Logo"
+                    className="h-8 w-8 object-contain shrink-0"
+                  />
+                  <div className="font-black text-[13px] uppercase leading-tight text-black">
+                    {company.name || 'OCTANE SYSTEM'}
                   </div>
-                )}
-                <div className="font-black text-[13px] uppercase text-black">{company.name}</div>
+                </div>
                 <div className="text-[11.5px] leading-snug font-semibold text-black">{company.address_line1}</div>
                 <div className="text-[11.5px] font-black pt-1 text-black">GSTIN/UIN: {company.gstin}</div>
                 <div className="text-[11.5px] font-black text-black">State Name: {company.state_name}, Code: {company.state_code}</div>
