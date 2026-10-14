@@ -51,6 +51,28 @@ export const numberToWordsRupees = (amount) => {
   return `Indian Rupees ${result.trim()} Only`;
 };
 
+// Helper function to format date as DD/MM/YYYY (Day/Month/Year)
+export const formatDateDMY = (dateVal) => {
+  if (!dateVal) return '—';
+  const str = String(dateVal).trim();
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) return str;
+
+  const isoMatch = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (isoMatch) {
+    const [, y, m, d] = isoMatch;
+    return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
+  }
+
+  const parsed = new Date(str);
+  if (!isNaN(parsed.getTime())) {
+    const day = String(parsed.getDate()).padStart(2, '0');
+    const month = String(parsed.getMonth() + 1).padStart(2, '0');
+    const year = parsed.getFullYear();
+    return `${day}/${month}/${year}`;
+  }
+  return str;
+};
+
 // Specifications and Variant Formatter Helper
 export const renderItemSpecsAndSku = (item) => {
   const specs = [];
@@ -252,7 +274,7 @@ const A4SinglePageCopy = ({ copyType, invoice, company }) => {
               </div>
               <div className="p-2">
                 <div className="text-[10px] font-bold text-black uppercase tracking-wider">Dated</div>
-                <div className="font-black text-[13px] font-mono text-black">{invoice.invoice_date || invoice.purchase_date || invoice.created_at || new Date().toLocaleDateString('en-IN')}</div>
+                <div className="font-black text-[13px] font-mono text-black">{formatDateDMY(invoice.invoice_date || invoice.purchase_date || invoice.created_at || new Date())}</div>
               </div>
             </div>
 
@@ -314,7 +336,7 @@ const A4SinglePageCopy = ({ copyType, invoice, company }) => {
                   </div>
                   <div className="p-1.5">
                     <div className="text-[10px] font-bold text-black uppercase">Dated</div>
-                    <div className="font-bold text-[11.5px] text-black">{invoice.buyer_order_date || '—'}</div>
+                    <div className="font-bold text-[11.5px] text-black">{invoice.buyer_order_date ? formatDateDMY(invoice.buyer_order_date) : '—'}</div>
                   </div>
                 </div>
 
@@ -570,16 +592,16 @@ const A4SinglePageCopy = ({ copyType, invoice, company }) => {
           </div>
 
           {/* 10. Signatures Grid */}
-          <div className="grid grid-cols-2 text-black min-h-[68px] items-end p-2 relative">
+          <div className="grid grid-cols-2 text-black min-h-[85px] items-end p-2 relative">
             <div className="font-bold text-[11px] text-black pb-1">Customer's / Vendor's Seal and Signature</div>
             <div className="flex flex-col items-end text-right">
+              <div className="font-black text-[12px] text-black leading-tight mb-1">for {company.name || 'OCTANE System'}</div>
               <img
                 src={company.seal || octaneSeal}
                 alt="Octane Systems Official Seal"
-                className="h-[68px] w-[68px] object-contain mb-1 mix-blend-multiply"
+                className="h-[65px] w-[65px] object-contain my-1 mix-blend-multiply"
               />
-              <div className="font-black text-[12px] text-black leading-tight">for {company.name || 'OCTANE System'}</div>
-              <div className="font-bold text-[11px] text-black pt-1">Authorised Signatory</div>
+              <div className="font-bold text-[11px] text-black">Authorised Signatory</div>
             </div>
           </div>
         </div>
