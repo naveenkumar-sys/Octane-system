@@ -146,10 +146,27 @@ export const ExecutiveDashboard = ({ onNavigate }) => {
     setEndDate(e);
   };
 
+  // Label for period matching selected preset
+  const periodLabel = useMemo(() => {
+    switch (activePreset) {
+      case 'today': return "Today's";
+      case 'this_week': return "This Week's";
+      case 'this_month': return "This Month's";
+      case 'this_quarter': return "This Quarter's";
+      case 'all_time': return "All-Time";
+      default: return "Period";
+    }
+  }, [activePreset]);
+
   // Safe real metrics mapping (100% database driven)
   const m = useMemo(() => {
     if (!metrics) return {};
     return {
+      periodNetSales: Number(metrics.period_net_grand_sales ?? metrics.today_sales ?? 0),
+      periodGrossSales: Number(metrics.period_gross_sales ?? metrics.today_gross_sales ?? 0),
+      periodSalesReturns: Number(metrics.period_sales_returns ?? metrics.today_sales_returns ?? 0),
+      periodNetTaxable: Number(metrics.period_net_sales ?? metrics.today_net_taxable_sales ?? 0),
+
       todaySales: Number(metrics.today_sales || 0),
       todayGrossSales: Number(metrics.today_gross_sales || 0),
       todaySalesReturns: Number(metrics.today_sales_returns || 0),
@@ -470,34 +487,34 @@ export const ExecutiveDashboard = ({ onNavigate }) => {
       ───────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         
-        {/* CARD 1: Today's sales */}
+        {/* CARD 1: Net Sales */}
         <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:shadow-md transition-all duration-200 flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold text-slate-500">Today&apos;s Net Sales</span>
+            <span className="text-sm font-semibold text-slate-500">{periodLabel} Net Sales</span>
             <div className="w-8 h-8 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center font-bold">
               <ArrowUpRight className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-4">
             <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-              {fmtRupee(m.todaySales)}
+              {fmtRupee(m.periodNetSales)}
             </div>
-            {m.todaySalesReturns > 0 ? (
+            {m.periodSalesReturns > 0 ? (
               <div className="mt-2 text-[11px] font-bold text-amber-800 flex flex-wrap items-center gap-1 font-mono bg-amber-50/80 px-2 py-1 rounded-lg border border-amber-200">
-                <span className="text-slate-600 font-sans">Gross: {fmtRupee(m.todayGrossSales)}</span>
+                <span className="text-slate-600 font-sans">Gross: {fmtRupee(m.periodGrossSales)}</span>
                 <span>•</span>
-                <span className="text-rose-600">↩ Ret: -{fmtRupee(m.todaySalesReturns)}</span>
+                <span className="text-rose-600">↩ Ret: -{fmtRupee(m.periodSalesReturns)}</span>
               </div>
             ) : (
               <div className="flex items-center gap-1.5 mt-2 text-xs font-semibold text-emerald-600">
-                {m.todaySales > 0 ? (
+                {m.periodNetSales > 0 ? (
                   <>
                     <span className="text-sm leading-none">↑</span>
-                    <span>{fmtRupee(m.todaySales)} billed today</span>
+                    <span>{fmtRupee(m.periodNetSales)} billed</span>
                   </>
                 ) : (
                   <span className="text-slate-400 font-normal">
-                    Month-to-date: <strong className="text-slate-700 font-semibold">{fmtLakhs(m.monthSales)}</strong>
+                    No sales recorded for this period
                   </span>
                 )}
               </div>

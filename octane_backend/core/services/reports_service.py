@@ -79,6 +79,34 @@ class ReportsService:
         today_sales = max(Decimal('0.00'), today_sales_gross - today_returns_taxable)
         today_net_gross_sales = max(Decimal('0.00'), today_gross_sales - today_returns_grand)
 
+        # Selected Period sales (for the selected start_date to end_date filter on dashboard)
+        period_invoices = Invoice.objects.filter(
+            invoice_date__gte=start_date,
+            invoice_date__lte=end_date,
+            invoice_status='POSTED'
+        )
+        period_gross_taxable = period_invoices.aggregate(sum=Sum('taxable_amount'))['sum'] or Decimal('0.00')
+        period_gross_sales = period_invoices.aggregate(sum=Sum('grand_total'))['sum'] or Decimal('0.00')
+
+        period_returns_movements = StockMovement.objects.filter(
+            movement_type='SALES_RETURN',
+            created_at__date__gte=start_date,
+            created_at__date__lte=end_date
+        )
+        period_returns_taxable = sum(
+            Decimal(str(m.quantity)) * (m.unit_price if m.unit_price > Decimal('0.00') else Decimal('0.00'))
+            for m in period_returns_movements
+        )
+        period_returns_grand = sum(
+            Decimal(str(m.quantity)) * ((m.unit_price if m.unit_price > Decimal('0.00') else Decimal('0.00')) + 
+                ((m.unit_price * (m.product.gst_rate if m.product else Decimal('18.00'))) / Decimal('100')))
+            for m in period_returns_movements
+        )
+        period_returns_units = period_returns_movements.aggregate(sum=Sum('quantity'))['sum'] or 0
+
+        period_net_sales = max(Decimal('0.00'), period_gross_taxable - period_returns_taxable)
+        period_net_grand_sales = max(Decimal('0.00'), period_gross_sales - period_returns_grand)
+
         yesterday_sales_gross = yesterday_invoices.aggregate(sum=Sum('taxable_amount'))['sum'] or Decimal('0.00')
         yesterday_returns = StockMovement.objects.filter(movement_type='SALES_RETURN', created_at__date=yesterday)
         yesterday_returns_taxable = sum(Decimal(str(m.quantity)) * (m.unit_price if m.unit_price > Decimal('0.00') else Decimal('0.00')) for m in yesterday_returns)
@@ -254,9 +282,10 @@ class ReportsService:
             'out_of_stock_count': out_of_stock_count,
             'partner_balances': partner_balances_formatted,
 
-            # Quick indicators & comparisons
-            'today_sales': float(today_sales),
-            'today_net_sales': float(today_sales),
+            # Quick indicators & comparisons (Reconciled with GST & Period)
+            'today_sales': float(today_net_gross_sales),
+            'today_net_sales': float(today_net_gross_sales),
+            'today_net_taxable_sales': float(today_sales),
             'today_gross_sales': float(today_gross_sales),
             'today_sales_returns': float(today_returns_grand),
             'today_returns_taxable': float(today_returns_taxable),
@@ -264,6 +293,15 @@ class ReportsService:
             'yesterday_sales': float(yesterday_sales),
             'today_vs_yesterday_pct': float(today_vs_yesterday_pct),
             'month_sales': float(month_sales),
+
+            # Period Sales for Selected Date Range Filter
+            'period_gross_sales': float(period_gross_sales),
+            'period_gross_taxable': float(period_gross_taxable),
+            'period_sales_returns': float(period_returns_grand),
+            'period_returns_taxable': float(period_returns_taxable),
+            'period_net_sales': float(period_net_sales),
+            'period_net_grand_sales': float(period_net_grand_sales),
+            'period_returns_units': int(period_returns_units),
 
             # Visual Chart & Analytics Data
             'seven_days_sales': seven_days_sales,
