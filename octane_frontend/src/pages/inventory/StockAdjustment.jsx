@@ -105,7 +105,7 @@ export const StockAdjustment = () => {
       const fetchSerials = async () => {
         setLoadingSerials(true);
         try {
-          const res = await api.getSerialNumbers(`?product=${selectedProduct.product_id}&status=AVAILABLE`);
+          const res = await api.getSerialNumbers(`?product=${selectedProduct.product_id}&status__in=AVAILABLE,RETURNED`);
           const list = Array.isArray(res) ? res : res.results || [];
           setAvailableSerials(list);
         } catch (err) {

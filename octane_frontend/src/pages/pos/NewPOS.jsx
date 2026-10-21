@@ -124,7 +124,7 @@ export const NewPOS = () => {
         api.getCustomers(),
         api.getPartners(),
         api.getServices(),
-        api.getSerialNumbers('?status=AVAILABLE').catch(() => []),
+        api.getSerialNumbers('?status__in=AVAILABLE,RETURNED').catch(() => []),
         api.getBusinessProfile().catch(() => null),
         api.getServiceCategories().catch(() => []),
       ]);
@@ -166,7 +166,7 @@ export const NewPOS = () => {
   const fetchSerialsForProduct = async (productId) => {
     if (availableSerialsCache[productId]) return availableSerialsCache[productId];
     try {
-      const res = await api.getSerialNumbers(`?product=${productId}&status=AVAILABLE`);
+      const res = await api.getSerialNumbers(`?product=${productId}&status__in=AVAILABLE,RETURNED`);
       const serialList = Array.isArray(res) ? res : res.results || [];
       setAvailableSerialsCache((prev) => ({ ...prev, [productId]: serialList }));
       return serialList;

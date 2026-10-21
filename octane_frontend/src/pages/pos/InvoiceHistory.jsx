@@ -16,9 +16,11 @@ import {
   User,
   Tag,
   DollarSign,
-  RotateCcw
+  RotateCcw,
+  Ban
 } from 'lucide-react';
 import { api } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import DataTable from '../../components/ui/DataTable';
 import StatusBadge from '../../components/ui/StatusBadge';
 import FormModal from '../../components/ui/FormModal';
@@ -47,6 +49,7 @@ export const isInvoiceGst = (inv) => {
 };
 
 export const InvoiceHistory = () => {
+  const { isAdmin } = useAuth();
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -63,6 +66,12 @@ export const InvoiceHistory = () => {
   const [printInvoice, setPrintInvoice] = useState(null);
   const [recordPaymentInvoice, setRecordPaymentInvoice] = useState(null);
 
+  // Cancel / Void Modal State
+  const [cancelInvoiceData, setCancelInvoiceData] = useState(null);
+  const [cancelReason, setCancelReason] = useState('Invoice voided by admin request');
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [cancelError, setCancelError] = useState(null);
+
   // Sales Return Modal State
   const [returnInvoice, setReturnInvoice] = useState(null);
   const [returnItemId, setReturnItemId] = useState('');
@@ -72,10 +81,38 @@ export const InvoiceHistory = () => {
   const [returnLoading, setReturnLoading] = useState(false);
   const [returnError, setReturnError] = useState(null);
 
+  const handleOpenCancel = (invoice) => {
+    setCancelInvoiceData(invoice);
+    setCancelReason('');
+    setCancelError(null);
+  };
+
+  const handleCancelSubmit = async (e) => {
+    e.preventDefault();
+    if (!cancelInvoiceData) return;
+    setCancelLoading(true);
+    setCancelError(null);
+    try {
+      await api.cancelInvoice(cancelInvoiceData.id, {
+        reason: cancelReason.trim() || 'Voided by Administrator',
+      });
+      toast.success(`Invoice #${cancelInvoiceData.invoice_number} has been cancelled.`);
+      setCancelInvoiceData(null);
+      if (detailInvoice && detailInvoice.id === cancelInvoiceData.id) {
+        setDetailInvoice(null);
+      }
+      fetchInvoices();
+    } catch (err) {
+      setCancelError(err.message || 'Failed to cancel invoice.');
+    } finally {
+      setCancelLoading(false);
+    }
+  };
+
   const handleOpenReturn = (invoice) => {
     setReturnInvoice(invoice);
-    const productItems = (invoice.items || []).filter((i) => i.item_type === 'PRODUCT');
-    const firstItem = productItems[0];
+    const items = invoice.items || [];
+    const firstItem = items[0];
     setReturnItemId(firstItem ? String(firstItem.id) : '');
     setReturnQty('1');
     setReturnSerial(firstItem?.serial_number?.serial_number || (typeof firstItem?.serial_number === 'string' ? firstItem.serial_number : '') || '');
@@ -311,45 +348,75 @@ export const InvoiceHistory = () => {
     {
       key: 'payment_status',
       header: 'Status',
-      render: (inv) => <StatusBadge status={inv.payment_status} type="payment" />,
+      render: (inv) => {
+        const isCancelled = inv.invoice_status === 'CANCELLED';
+        return (
+          <div className="flex flex-col gap-1 items-start">
+            {isCancelled ? (
+              <StatusBadge status="CANCELLED" />
+            ) : (
+              <StatusBadge status={inv.payment_status} type="payment" />
+            )}
+            {inv.has_returns && (
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                ↩ Ret: ₹{parseFloat(inv.returned_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </span>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: 'actions',
       header: 'Actions',
-      render: (inv) => (
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setDetailInvoice(inv)}
-            className="p-1.5 text-slate-600 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors cursor-pointer"
-            title="View Details"
-          >
-            <Eye size={15} />
-          </button>
-          <button
-            onClick={() => handleOpenReturn(inv)}
-            className="p-1.5 text-slate-600 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
-            title="Process Sales Return"
-          >
-            <RotateCcw size={15} />
-          </button>
-          {parseFloat(inv.balance_due_amount || 0) > 0 && (
+      render: (inv) => {
+        const isCancelled = inv.invoice_status === 'CANCELLED';
+        return (
+          <div className="flex items-center gap-1">
             <button
-              onClick={() => setRecordPaymentInvoice(inv)}
-              className="p-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
-              title="Record Payment"
+              onClick={() => setDetailInvoice(inv)}
+              className="p-1.5 text-slate-600 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors cursor-pointer"
+              title="View Details"
             >
-              <CreditCard size={15} />
+              <Eye size={15} />
             </button>
-          )}
-          <button
-            onClick={() => setPrintInvoice(inv)}
-            className="p-1.5 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
-            title="Print A4 Invoice"
-          >
-            <Printer size={15} />
-          </button>
-        </div>
-      ),
+            {!isCancelled && (
+              <button
+                onClick={() => handleOpenReturn(inv)}
+                className="p-1.5 text-slate-600 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
+                title="Process Sales Return"
+              >
+                <RotateCcw size={15} />
+              </button>
+            )}
+            {!isCancelled && parseFloat(inv.balance_due_amount || 0) > 0 && (
+              <button
+                onClick={() => setRecordPaymentInvoice(inv)}
+                className="p-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                title="Record Payment"
+              >
+                <CreditCard size={15} />
+              </button>
+            )}
+            <button
+              onClick={() => setPrintInvoice(inv)}
+              className="p-1.5 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
+              title="Print A4 Invoice"
+            >
+              <Printer size={15} />
+            </button>
+            {!isCancelled && isAdmin && (
+              <button
+                onClick={() => handleOpenCancel(inv)}
+                className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                title="Cancel / Void Invoice"
+              >
+                <Ban size={15} />
+              </button>
+            )}
+          </div>
+        );
+      },
     },
   ];
 
@@ -544,7 +611,11 @@ export const InvoiceHistory = () => {
               <div>
                 <div className="flex items-center gap-2">
                   <h2 className="text-lg font-extrabold text-slate-900 font-mono">Invoice #{detailInvoice.invoice_number}</h2>
-                  <StatusBadge status={detailInvoice.payment_status} type="payment" />
+                  {detailInvoice.invoice_status === 'CANCELLED' ? (
+                    <StatusBadge status="CANCELLED" />
+                  ) : (
+                    <StatusBadge status={detailInvoice.payment_status} type="payment" />
+                  )}
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Issued on <strong>{detailInvoice.invoice_date}</strong> • Cashier: <strong>{detailInvoice.created_by_name || 'Admin'}</strong>
@@ -557,6 +628,34 @@ export const InvoiceHistory = () => {
                 <X size={20} />
               </button>
             </div>
+
+            {/* Cancelled Alert Banner */}
+            {detailInvoice.invoice_status === 'CANCELLED' && (
+              <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl flex items-start gap-3">
+                <AlertCircle size={18} className="text-rose-600 shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-extrabold text-xs text-rose-900 uppercase tracking-wide">
+                    Document Cancelled & Voided
+                  </div>
+                  <div className="text-[11px] text-rose-700 mt-0.5 leading-relaxed">
+                    {detailInvoice.notes || 'This invoice has been voided by the store administrator. All inward stock/serials were restored to inventory.'}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Sales Return Banner */}
+            {detailInvoice.has_returns && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between text-xs text-amber-900 font-bold">
+                <span className="flex items-center gap-1.5">
+                  <RotateCcw size={14} className="text-amber-700" />
+                  Sales Return Recorded
+                </span>
+                <span className="font-mono text-amber-800">
+                  Total Returned: ₹{parseFloat(detailInvoice.returned_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            )}
 
             {/* Customer & Billing Info */}
             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2 text-xs">
@@ -699,24 +798,39 @@ export const InvoiceHistory = () => {
               </button>
 
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleOpenReturn(detailInvoice)}
-                  className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer"
-                >
-                  <RotateCcw size={14} />
-                  <span>Process Return</span>
-                </button>
+                {detailInvoice.invoice_status !== 'CANCELLED' && (
+                  <>
+                    <button
+                      onClick={() => handleOpenReturn(detailInvoice)}
+                      className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <RotateCcw size={14} />
+                      <span>Process Return</span>
+                    </button>
 
-                {parseFloat(detailInvoice.balance_due_amount || 0) > 0 && (
-                  <button
-                    onClick={() => {
-                      setRecordPaymentInvoice(detailInvoice);
-                    }}
-                    className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-md cursor-pointer"
-                  >
-                    <CreditCard size={15} />
-                    <span>Record Payment (₹{parseFloat(detailInvoice.balance_due_amount).toFixed(2)})</span>
-                  </button>
+                    {parseFloat(detailInvoice.balance_due_amount || 0) > 0 && (
+                      <button
+                        onClick={() => {
+                          setRecordPaymentInvoice(detailInvoice);
+                        }}
+                        className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-md cursor-pointer"
+                      >
+                        <CreditCard size={15} />
+                        <span>Record Payment (₹{parseFloat(detailInvoice.balance_due_amount).toFixed(2)})</span>
+                      </button>
+                    )}
+
+                    {isAdmin && (
+                      <button
+                        onClick={() => handleOpenCancel(detailInvoice)}
+                        className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer"
+                        title="Cancel / Void this invoice"
+                      >
+                        <Ban size={14} />
+                        <span>Void Invoice</span>
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -746,16 +860,15 @@ export const InvoiceHistory = () => {
                   setReturnItemId(e.target.value);
                   const item = (returnInvoice.items || []).find((i) => String(i.id) === String(e.target.value));
                   setReturnSerial(item?.serial_number?.serial_number || (typeof item?.serial_number === 'string' ? item.serial_number : '') || '');
+                  setReturnQty('1');
                 }}
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500/30"
               >
-                {(returnInvoice.items || [])
-                  .filter((i) => i.item_type === 'PRODUCT')
-                  .map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.description} (Sold Qty: {item.quantity})
-                    </option>
-                  ))}
+                {(returnInvoice.items || []).map((item) => (
+                  <option key={item.id} value={item.id}>
+                    [{item.item_type}] {item.description} (Sold Qty: {item.quantity})
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -804,6 +917,44 @@ export const InvoiceHistory = () => {
                 onChange={(e) => setReturnReason(e.target.value)}
                 placeholder="Reason for customer sales return..."
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500/30"
+              />
+            </div>
+          </div>
+        </FormModal>
+      )}
+
+      {/* Cancel / Void Invoice Confirmation Modal */}
+      {cancelInvoiceData && (
+        <FormModal
+          isOpen={Boolean(cancelInvoiceData)}
+          onClose={() => setCancelInvoiceData(null)}
+          onSubmit={handleCancelSubmit}
+          loading={cancelLoading}
+          title={`Cancel & Void Invoice #${cancelInvoiceData.invoice_number}`}
+          subtitle={`Customer: ${cancelInvoiceData.buyer_name || 'Cash Customer'} • Grand Total: ₹${parseFloat(cancelInvoiceData.grand_total || 0).toFixed(2)}`}
+          submitLabel="Confirm Cancellation"
+          error={cancelError}
+        >
+          <div className="space-y-4">
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 space-y-1">
+              <div className="font-bold flex items-center gap-1.5">
+                <AlertCircle size={15} className="text-rose-600" />
+                Warning: Irreversible Soft Cancellation
+              </div>
+              <p className="text-[11px] leading-relaxed">
+                Cancelling this invoice will mark it as <strong>CANCELLED / VOID</strong>, restore any outward sold serial numbers and stock back to available inventory, remove linked ledger payments, and retain this invoice for audit compliance.
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-700">Cancellation Reason *</label>
+              <textarea
+                rows={3}
+                required
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="Enter reason for cancelling this invoice (e.g. customer request, billing error)..."
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-rose-500/30"
               />
             </div>
           </div>

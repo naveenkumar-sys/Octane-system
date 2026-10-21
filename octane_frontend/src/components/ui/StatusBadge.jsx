@@ -1,6 +1,15 @@
 import React from 'react';
 
 export const StatusBadge = ({ status, type = 'status' }) => {
+  if (status === 'CANCELLED') {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-mono font-bold uppercase tracking-wider border bg-rose-100/80 text-rose-800 border-rose-300">
+        <span className="w-1.5 h-1.5 rounded-full bg-rose-600" />
+        <span>CANCELLED</span>
+      </span>
+    );
+  }
+
   // Handle Payment Statuses (PAID, PARTIALLY_PAID, UNPAID)
   if (type === 'payment' || status === 'PAID' || status === 'PARTIALLY_PAID' || status === 'UNPAID') {
     const isPaid = status === 'PAID';

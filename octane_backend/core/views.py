@@ -425,9 +425,15 @@ class SerialNumberViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = SerialNumberSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['product', 'status']
-    search_fields = ['serial_number', 'product__name', 'purchase_reference', 'invoice_reference']
     ordering = ['serial_number']
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        status_in = self.request.query_params.get('status__in')
+        if status_in:
+            statuses = [s.strip() for s in status_in.split(',') if s.strip()]
+            qs = qs.filter(status__in=statuses)
+        return qs
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAdminUser])
     def update_status(self, request, pk=None):
@@ -727,6 +733,63 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         else:
             payment_serializer = PaymentSerializer(payment_res)
         return Response(payment_serializer.data, status=status.HTTP_201_CREATED)
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAdminUser])
+    @transaction.atomic
+    def cancel(self, request, pk=None):
+        invoice = self.get_object()
+        if invoice.invoice_status == 'CANCELLED':
+            return Response(
+                {"error": f"Invoice #{invoice.invoice_number} is already cancelled."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 1. Block cancellation if sales returns have been processed against this invoice
+        sales_returns = StockMovement.objects.filter(
+            reference_type='SALES_RETURN',
+            reference_id=invoice.invoice_number
+        )
+        if sales_returns.exists():
+            return Response(
+                {"error": f"Cannot cancel Invoice #{invoice.invoice_number} because customer sales returns have already been processed against it."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        reason = request.data.get('reason', 'Cancelled by Admin')
+
+        # 2. Revert serial numbers from SOLD back to AVAILABLE
+        for item in invoice.items.select_related('product', 'serial_number').all():
+            if item.item_type == 'PRODUCT' and item.product:
+                if item.product.tracking_type == 'SERIAL_NUMBER':
+                    if item.serial_number:
+                        item.serial_number.status = 'AVAILABLE'
+                        item.serial_number.invoice_reference = None
+                        item.serial_number.save()
+
+        # 3. Clean up StockMovements created by this invoice (SALE outwards)
+        StockMovement.objects.filter(
+            reference_type='INVOICE',
+            reference_id=invoice.invoice_number
+        ).delete()
+
+        # 4. Clean up Payments created for this invoice
+        invoice.payments.all().delete()
+
+        # 5. Mark invoice as CANCELLED
+        invoice.invoice_status = 'CANCELLED'
+        invoice.total_paid_amount = Decimal('0.00')
+        invoice.balance_due_amount = Decimal('0.00')
+        invoice.payment_status = 'UNPAID'
+        invoice.notes = f"[CANCELLED: {reason}] " + (invoice.notes or '')
+        invoice.save()
+
+        return Response(
+            {
+                "message": f"Invoice #{invoice.invoice_number} has been cancelled successfully. Stock and serial numbers have been restored.",
+                "invoice_number": invoice.invoice_number,
+                "status": "CANCELLED"
+            },
+            status=status.HTTP_200_OK
+        )
 
     @transaction.atomic
     def destroy(self, request, *args, **kwargs):
@@ -978,6 +1041,78 @@ class PurchaseViewSet(viewsets.ModelViewSet):
         )
         out_serializer = SupplierPaymentSerializer(payment)
         return Response(out_serializer.data, status=status.HTTP_201_CREATED)
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAdminUser])
+    @transaction.atomic
+    def cancel(self, request, pk=None):
+        purchase = self.get_object()
+        if purchase.notes and '[CANCELLED' in purchase.notes:
+            return Response(
+                {"error": f"Purchase #{purchase.purchase_number} is already cancelled."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 1. Check if any serial number inwarded by this purchase has been sold
+        linked_serials = SerialNumber.objects.filter(
+            purchase_reference__icontains=purchase.purchase_number
+        )
+        sold_serials = linked_serials.filter(status='SOLD')
+        if sold_serials.exists():
+            sold_list = ", ".join(sold_serials.values_list('serial_number', flat=True)[:5])
+            return Response(
+                {"error": f"Cannot cancel Purchase #{purchase.purchase_number} because serial number(s) inwarded by this purchase ({sold_list}) have already been sold in customer invoices."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 2. Check if any purchase returns have been processed against this purchase
+        return_movements = StockMovement.objects.filter(
+            reference_type='PURCHASE_RETURN',
+            reference_id=purchase.purchase_number
+        )
+        if return_movements.exists():
+            return Response(
+                {"error": f"Cannot cancel Purchase #{purchase.purchase_number} because purchase returns have already been processed against it."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 3. For quantity-tracked items, check if current stock is lower than purchase quantity
+        for item in purchase.items.select_related('product').all():
+            if item.product and item.product.tracking_type == 'QUANTITY' and item.product.is_stock_enabled:
+                curr_stock = item.product.get_current_stock()
+                if curr_stock < item.quantity:
+                    return Response(
+                        {"error": f"Cannot cancel Purchase #{purchase.purchase_number} because {item.quantity - curr_stock} unit(s) of '{item.product.name}' have already been sold or moved out."},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+        reason = request.data.get('reason', 'Cancelled by Admin')
+
+        # 4. Clean up StockMovements created by this purchase
+        StockMovement.objects.filter(
+            reference_type='PURCHASE',
+            reference_id=purchase.purchase_number
+        ).delete()
+
+        # 5. Clean up inwarded SerialNumbers
+        linked_serials.delete()
+
+        # 6. Clean up SupplierPayments linked to this purchase
+        SupplierPayment.objects.filter(purchase=purchase).delete()
+
+        # 7. Mark purchase as CANCELLED
+        purchase.total_amount = Decimal('0.00')
+        purchase.paid_amount = Decimal('0.00')
+        purchase.tax_amount = Decimal('0.00')
+        purchase.payment_status = 'UNPAID'
+        purchase.notes = f"[CANCELLED: {reason}] " + (purchase.notes or '')
+        purchase.save()
+
+        return Response(
+            {
+                "message": f"Purchase #{purchase.purchase_number} has been cancelled successfully. Stock has been deducted.",
+                "purchase_number": purchase.purchase_number
+            },
+            status=status.HTTP_200_OK
+        )
 
     @transaction.atomic
     def destroy(self, request, *args, **kwargs):

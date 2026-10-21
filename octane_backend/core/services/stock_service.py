@@ -59,7 +59,7 @@ class StockService:
                         f"Serial number '{serial_number_str}' for product '{product.name}' cannot be adjusted or returned because its status is '{serial_obj.status}'."
                     )
             else:
-                if serial_obj.status != 'AVAILABLE':
+                if serial_obj.status not in ['AVAILABLE', 'RETURNED']:
                     raise ValidationError(
                         f"Serial number '{serial_number_str}' for product '{product.name}' is already {serial_obj.status}."
                     )

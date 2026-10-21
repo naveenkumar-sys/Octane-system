@@ -128,10 +128,15 @@ const A4SinglePageCopy = ({ copyType, invoice, company }) => {
     (parseFloat(invoice.total_tax || 0) === 0 && !invoice.buyer_gstin && !invoice.customer_gstin)
   );
 
+  const isCancelled = Boolean(
+    invoice.invoice_status === 'CANCELLED' ||
+    (typeof invoice.notes === 'string' && invoice.notes.startsWith('[CANCELLED'))
+  );
+
   const documentTitle = invoice.title || (
     isPurchase
-      ? 'PURCHASE VOUCHER / STOCK RECEIPT'
-      : (isNonGst ? 'ESTIMATE / CASH MEMO' : 'TAX INVOICE')
+      ? (isCancelled ? 'PURCHASE VOUCHER (CANCELLED / VOID)' : 'PURCHASE VOUCHER / STOCK RECEIPT')
+      : (isCancelled ? (isNonGst ? 'ESTIMATE / CASH MEMO (CANCELLED / VOID)' : 'TAX INVOICE (CANCELLED / VOID)') : (isNonGst ? 'ESTIMATE / CASH MEMO' : 'TAX INVOICE'))
   );
 
   // Aggregated HSN/SAC summary
@@ -190,11 +195,24 @@ const A4SinglePageCopy = ({ copyType, invoice, company }) => {
   const paymentStatus = invoice.payment_status || (amountPaid === 0 ? 'UNPAID' : (amountPaid >= grandTotal - 0.01 ? 'PAID' : 'PARTIALLY_PAID'));
 
   return (
-    <div className="w-[210mm] max-w-full h-[297mm] max-h-[297mm] print:w-[210mm] print:max-w-[210mm] print:h-[295mm] print:max-h-[295mm] box-border p-[6mm] print:p-[4mm] flex flex-col justify-between overflow-hidden bg-white text-black font-sans text-[11.5px] leading-tight select-none shadow-2xl print:shadow-none print:border-none mx-auto page-break-inside-avoid">
+    <div className="relative w-[210mm] max-w-full h-[297mm] max-h-[297mm] print:w-[210mm] print:max-w-[210mm] print:h-[295mm] print:max-h-[295mm] box-border p-[6mm] print:p-[4mm] flex flex-col justify-between overflow-hidden bg-white text-black font-sans text-[11.5px] leading-tight select-none shadow-2xl print:shadow-none print:border-none mx-auto page-break-inside-avoid">
+      {isCancelled && (
+        <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-50 overflow-hidden">
+          <div className="border-[6px] border-rose-600/35 text-rose-600/35 text-5xl font-black uppercase tracking-widest px-10 py-3 rotate-[-30deg] select-none">
+            CANCELLED / VOID
+          </div>
+        </div>
+      )}
       {/* 1. Header Title & Copy Type */}
       <div className="flex items-center justify-between pb-1 flex-shrink-0">
-        <div className="w-1/4"></div>
-        <h1 className="text-lg font-black text-center uppercase tracking-wider w-2/4 text-black">
+        <div className="w-1/4">
+          {isCancelled && (
+            <span className="bg-rose-100 text-rose-800 text-[10px] font-mono font-black px-2 py-0.5 rounded border border-rose-300">
+              DOCUMENT VOIDED
+            </span>
+          )}
+        </div>
+        <h1 className={`text-lg font-black text-center uppercase tracking-wider w-2/4 ${isCancelled ? 'text-rose-700' : 'text-black'}`}>
           {documentTitle}
         </h1>
         <div className="text-[11px] font-bold text-right italic uppercase w-1/4 text-black">

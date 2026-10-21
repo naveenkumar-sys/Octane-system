@@ -589,10 +589,30 @@ class InvoiceSerializer(serializers.ModelSerializer):
     items = InvoiceItemSerializer(many=True, read_only=True)
     payments = PaymentSerializer(many=True, read_only=True)
     customer_name = serializers.CharField(source='customer.name', read_only=True)
+    has_returns = serializers.SerializerMethodField()
+    returned_amount = serializers.SerializerMethodField()
 
     class Meta:
         model = Invoice
         fields = '__all__'
+
+    def get_has_returns(self, obj):
+        from core.models import StockMovement
+        return StockMovement.objects.filter(
+            reference_type='SALES_RETURN',
+            reference_id=obj.invoice_number
+        ).exists()
+
+    def get_returned_amount(self, obj):
+        from core.models import StockMovement
+        moves = StockMovement.objects.filter(
+            reference_type='SALES_RETURN',
+            reference_id=obj.invoice_number
+        )
+        return float(sum(
+            Decimal(str(m.quantity)) * (m.unit_price if m.unit_price > Decimal('0.00') else Decimal('0.00'))
+            for m in moves
+        ))
 
 
 class CreateInvoiceItemInputSerializer(serializers.Serializer):
@@ -668,6 +688,8 @@ class PurchaseSerializer(serializers.ModelSerializer):
     supplier_name = serializers.CharField(source='supplier.name', read_only=True)
     paid_by_partner_name = serializers.CharField(source='paid_by_partner.name', read_only=True)
     balance_amount = serializers.SerializerMethodField()
+    has_returns = serializers.SerializerMethodField()
+    returned_amount = serializers.SerializerMethodField()
 
     class Meta:
         model = Purchase
@@ -675,6 +697,24 @@ class PurchaseSerializer(serializers.ModelSerializer):
 
     def get_balance_amount(self, obj):
         return max(Decimal('0.00'), obj.total_amount - obj.paid_amount)
+
+    def get_has_returns(self, obj):
+        from core.models import StockMovement
+        return StockMovement.objects.filter(
+            reference_type='PURCHASE_RETURN',
+            reference_id=obj.purchase_number
+        ).exists()
+
+    def get_returned_amount(self, obj):
+        from core.models import StockMovement
+        moves = StockMovement.objects.filter(
+            reference_type='PURCHASE_RETURN',
+            reference_id=obj.purchase_number
+        )
+        return float(sum(
+            Decimal(str(m.quantity)) * (m.unit_cost if m.unit_cost > Decimal('0.00') else Decimal('0.00'))
+            for m in moves
+        ))
 
 
 class CreatePurchaseItemInputSerializer(serializers.Serializer):

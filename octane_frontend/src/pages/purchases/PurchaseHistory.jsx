@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Receipt, Eye, CreditCard, RotateCcw, Plus, RefreshCw, Printer } from 'lucide-react';
+import { Receipt, Eye, CreditCard, RotateCcw, Plus, RefreshCw, Printer, Ban, AlertCircle } from 'lucide-react';
 import { api } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
+import { toast } from 'react-toastify';
 import DataTable from '../../components/ui/DataTable';
 import SearchBar from '../../components/ui/SearchBar';
 import FilterBar from '../../components/ui/FilterBar';
@@ -10,6 +12,7 @@ import { LoadingState, EmptyState, ErrorState } from '../../components/ui/StateV
 import A4InvoicePrintModal from '../../components/invoice/A4InvoicePrint';
 
 export const PurchaseHistory = ({ onSelectRoute }) => {
+  const { isAdmin } = useAuth();
   const [purchases, setPurchases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -17,6 +20,12 @@ export const PurchaseHistory = ({ onSelectRoute }) => {
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
   const [filterValues, setFilterValues] = useState({ payment_status: 'ALL' });
+
+  // Cancel Purchase Modal State
+  const [cancelPurchaseData, setCancelPurchaseData] = useState(null);
+  const [cancelReason, setCancelReason] = useState('Supplier entry mistake / voided');
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [cancelError, setCancelError] = useState(null);
 
   // Detail Modal State
   const [detailPurchase, setDetailPurchase] = useState(null);
@@ -139,6 +148,34 @@ export const PurchaseHistory = ({ onSelectRoute }) => {
     }
   };
 
+  const handleOpenCancel = (purchase) => {
+    setCancelPurchaseData(purchase);
+    setCancelReason('');
+    setCancelError(null);
+  };
+
+  const handleCancelSubmit = async (e) => {
+    e.preventDefault();
+    if (!cancelPurchaseData) return;
+    setCancelLoading(true);
+    setCancelError(null);
+    try {
+      await api.cancelPurchase(cancelPurchaseData.id, {
+        reason: cancelReason.trim() || 'Voided by Administrator',
+      });
+      toast.success(`Purchase #${cancelPurchaseData.purchase_number} has been cancelled.`);
+      setCancelPurchaseData(null);
+      if (detailPurchase && detailPurchase.id === cancelPurchaseData.id) {
+        setDetailPurchase(null);
+      }
+      fetchPurchases();
+    } catch (err) {
+      setCancelError(err.message || 'Failed to cancel purchase.');
+    } finally {
+      setCancelLoading(false);
+    }
+  };
+
   // Filtered purchases
   const filteredPurchases = purchases.filter((p) => {
     const matchesSearch =
@@ -229,13 +266,30 @@ export const PurchaseHistory = ({ onSelectRoute }) => {
       header: 'Status',
       accessor: 'payment_status',
       sortable: true,
-      render: (row) => <StatusBadge status={row.payment_status} type="payment" />,
+      render: (row) => {
+        const isCancelled = Boolean(row.notes && row.notes.startsWith('[CANCELLED'));
+        return (
+          <div className="flex flex-col gap-1 items-start">
+            {isCancelled ? (
+              <StatusBadge status="CANCELLED" />
+            ) : (
+              <StatusBadge status={row.payment_status} type="payment" />
+            )}
+            {row.has_returns && (
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                ↩ Ret: ₹{parseFloat(row.returned_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </span>
+            )}
+          </div>
+        );
+      },
     },
     {
       header: 'Actions',
       accessor: 'actions',
       className: 'text-right',
       render: (row) => {
+        const isCancelled = Boolean(row.notes && row.notes.startsWith('[CANCELLED'));
         const balance = Math.max(0, parseFloat(row.total_amount || 0) - parseFloat(row.paid_amount || 0));
 
         return (
@@ -256,7 +310,7 @@ export const PurchaseHistory = ({ onSelectRoute }) => {
               <Eye size={16} />
             </button>
 
-            {balance > 0 && (
+            {!isCancelled && balance > 0 && (
               <button
                 onClick={() => handleOpenRecordPayment(row)}
                 className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 transition-colors"
@@ -266,13 +320,25 @@ export const PurchaseHistory = ({ onSelectRoute }) => {
               </button>
             )}
 
-            <button
-              onClick={() => handleOpenReturn(row)}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
-              title="Process Purchase Return"
-            >
-              <RotateCcw size={16} />
-            </button>
+            {!isCancelled && (
+              <button
+                onClick={() => handleOpenReturn(row)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                title="Process Purchase Return"
+              >
+                <RotateCcw size={16} />
+              </button>
+            )}
+
+            {!isCancelled && isAdmin && (
+              <button
+                onClick={() => handleOpenCancel(row)}
+                className="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition-colors cursor-pointer"
+                title="Cancel / Void Purchase"
+              >
+                <Ban size={16} />
+              </button>
+            )}
           </div>
         );
       },
@@ -372,16 +438,64 @@ export const PurchaseHistory = ({ onSelectRoute }) => {
           }}
         >
           <div className="space-y-4">
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={() => setPrintInvoiceData(detailPurchase)}
-                className="flex items-center gap-2 px-3.5 py-1.5 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer transition-all"
-              >
-                <Printer size={14} />
-                <span>Print A4 Tax Invoice</span>
-              </button>
+            <div className="flex justify-between items-center">
+              <div>
+                {Boolean(detailPurchase.notes && detailPurchase.notes.startsWith('[CANCELLED')) ? (
+                  <StatusBadge status="CANCELLED" />
+                ) : (
+                  <StatusBadge status={detailPurchase.payment_status} type="payment" />
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPrintInvoiceData(detailPurchase)}
+                  className="flex items-center gap-2 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer transition-all"
+                >
+                  <Printer size={14} />
+                  <span>Print A4 Invoice</span>
+                </button>
+
+                {!Boolean(detailPurchase.notes && detailPurchase.notes.startsWith('[CANCELLED')) && isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleOpenCancel(detailPurchase);
+                    }}
+                    className="flex items-center gap-2 px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 text-xs font-bold rounded-xl shadow-xs cursor-pointer transition-all"
+                  >
+                    <Ban size={14} />
+                    <span>Void Purchase</span>
+                  </button>
+                )}
+              </div>
             </div>
+
+            {Boolean(detailPurchase.notes && detailPurchase.notes.startsWith('[CANCELLED')) && (
+              <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl flex items-start gap-3">
+                <AlertCircle size={18} className="text-rose-600 shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-extrabold text-xs text-rose-900 uppercase tracking-wide">
+                    Purchase Voucher Cancelled & Voided
+                  </div>
+                  <div className="text-[11px] text-rose-700 mt-0.5 leading-relaxed">
+                    {detailPurchase.notes}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {detailPurchase.has_returns && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between text-xs text-amber-900 font-bold">
+                <span className="flex items-center gap-1.5">
+                  <RotateCcw size={14} className="text-amber-700" />
+                  Purchase Return Recorded
+                </span>
+                <span className="font-mono text-amber-800">
+                  Total Returned: ₹{parseFloat(detailPurchase.returned_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs">
               <div>
@@ -649,6 +763,44 @@ export const PurchaseHistory = ({ onSelectRoute }) => {
                 value={returnReason}
                 onChange={(e) => setReturnReason(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500/30"
+              />
+            </div>
+          </div>
+        </FormModal>
+      )}
+
+      {/* Cancel / Void Purchase Confirmation Modal */}
+      {cancelPurchaseData && (
+        <FormModal
+          isOpen={Boolean(cancelPurchaseData)}
+          onClose={() => setCancelPurchaseData(null)}
+          onSubmit={handleCancelSubmit}
+          loading={cancelLoading}
+          title={`Cancel & Void Purchase #${cancelPurchaseData.purchase_number}`}
+          subtitle={`Supplier: ${cancelPurchaseData.supplier_name || 'N/A'} • Total: ₹${parseFloat(cancelPurchaseData.total_amount || 0).toFixed(2)}`}
+          submitLabel="Confirm Cancellation"
+          error={cancelError}
+        >
+          <div className="space-y-4">
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 space-y-1">
+              <div className="font-bold flex items-center gap-1.5">
+                <AlertCircle size={15} className="text-rose-600" />
+                Warning: Irreversible Soft Cancellation
+              </div>
+              <p className="text-[11px] leading-relaxed">
+                Cancelling this purchase entry will mark it as <strong>CANCELLED / VOID</strong>, remove the inward inventory movements and unallocated serial numbers, reverse partner ledger contributions, and retain this record for vendor audit history.
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-700">Cancellation Reason *</label>
+              <textarea
+                rows={3}
+                required
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="Enter reason for cancelling this purchase entry..."
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-rose-500/30"
               />
             </div>
           </div>

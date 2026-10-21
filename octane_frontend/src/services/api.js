@@ -229,6 +229,8 @@ export const api = {
     apiRequest(`/purchases/${purchaseId}/record-payment/`, { method: 'POST', body: JSON.stringify(data) }),
   processPurchaseReturn: (purchaseId, data) =>
     apiRequest(`/purchases/${purchaseId}/purchase-return/`, { method: 'POST', body: JSON.stringify(data) }),
+  cancelPurchase: (purchaseId, data) =>
+    apiRequest(`/purchases/${purchaseId}/cancel/`, { method: 'POST', body: JSON.stringify(data) }),
   getSupplierPayments: (params = '') => apiRequest(`/supplier-payments/${params}`),
   getInvoices: (params = '') => apiRequest(`/invoices/${params}`),
   getInvoice: (id) => apiRequest(`/invoices/${id}/`),
@@ -237,6 +239,8 @@ export const api = {
     apiRequest(`/invoices/${invoiceId}/record-payment/`, { method: 'POST', body: JSON.stringify(data) }),
   processSalesReturn: (invoiceId, data) =>
     apiRequest(`/invoices/${invoiceId}/sales-return/`, { method: 'POST', body: JSON.stringify(data) }),
+  cancelInvoice: (invoiceId, data) =>
+    apiRequest(`/invoices/${invoiceId}/cancel/`, { method: 'POST', body: JSON.stringify(data) }),
   getPayments: (params = '') => apiRequest(`/payments/${params}`),
   getAllPayments: (params = '') => apiRequest(`/finance/all-payments/${params}`),
   getExpenses: (params = '') => apiRequest(`/expenses/${params}`),
