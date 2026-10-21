@@ -251,18 +251,25 @@ export const InvoiceHistory = () => {
 
   // Overall Metrics Calculation
   const metrics = useMemo(() => {
-    const totalCount = filteredInvoices.length;
+    let totalCount = 0;
     let totalBilled = 0;
+    let totalReturned = 0;
     let totalPaid = 0;
     let totalBalance = 0;
 
     filteredInvoices.forEach((inv) => {
-      totalBilled += parseFloat(inv.grand_total || 0);
-      totalPaid += parseFloat(inv.total_paid_amount || 0);
-      totalBalance += parseFloat(inv.balance_due_amount || 0);
+      totalCount += 1;
+      if (inv.invoice_status !== 'CANCELLED') {
+        totalBilled += parseFloat(inv.grand_total || 0);
+        totalReturned += parseFloat(inv.returned_amount || 0);
+        totalPaid += parseFloat(inv.total_paid_amount || 0);
+        totalBalance += parseFloat(inv.balance_due_amount || 0);
+      }
     });
 
-    return { totalCount, totalBilled, totalPaid, totalBalance };
+    const netBilled = Math.max(0, totalBilled - totalReturned);
+
+    return { totalCount, totalBilled, totalReturned, netBilled, totalPaid, totalBalance };
   }, [filteredInvoices]);
 
   const columns = [
@@ -436,11 +443,20 @@ export const InvoiceHistory = () => {
 
         <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-1">
           <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-            {invoiceTypeTab === 'NON_GST' ? 'Non-GST Billed' : 'Total Revenue Billed'}
+            {invoiceTypeTab === 'NON_GST' ? 'Net Non-GST Revenue' : 'Net Sales Revenue'}
           </div>
           <div className="text-xl font-extrabold text-slate-900 font-mono">
-            ₹{metrics.totalBilled.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            ₹{metrics.netBilled.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
           </div>
+          {metrics.totalReturned > 0 ? (
+            <div className="text-[10px] text-amber-700 font-mono font-bold flex items-center gap-1">
+              <span>Gross: ₹{metrics.totalBilled.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              <span>•</span>
+              <span className="text-rose-600">↩ Ret: -₹{metrics.totalReturned.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+            </div>
+          ) : (
+            <div className="text-[10px] text-slate-400 font-mono">100% Realized Revenue</div>
+          )}
         </div>
 
         <div className="p-4 bg-white rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50/50 to-white shadow-2xs space-y-1">

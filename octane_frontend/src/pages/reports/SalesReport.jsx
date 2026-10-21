@@ -53,10 +53,19 @@ const COLUMNS = [
   { key: 'total_tax', label: 'GST', align: 'right', format: 'currency', render: (v) => fmt(v) },
   {
     key: 'grand_total',
-    label: 'Total',
+    label: 'Total / Net',
     align: 'right',
     format: 'currency',
-    render: (v) => <span className="font-extrabold text-slate-900">{fmt(v)}</span>,
+    render: (v, row) => (
+      <div>
+        <span className="font-extrabold text-slate-900">{fmt(row?.net_grand_total !== undefined ? row.net_grand_total : v)}</span>
+        {row?.has_returns && (
+          <div className="text-[10px] text-rose-600 font-mono font-bold">
+            ↩ Ret: -{fmt(row.returned_amount)}
+          </div>
+        )}
+      </div>
+    ),
   },
   {
     key: 'amount_paid',
@@ -181,6 +190,8 @@ const SalesReport = () => {
     const taxable = displayedRows.reduce((sum, r) => sum + Number(r.taxable_amount || 0), 0);
     const tax = displayedRows.reduce((sum, r) => sum + Number(r.total_tax || 0), 0);
     const grand = displayedRows.reduce((sum, r) => sum + Number(r.grand_total || 0), 0);
+    const returned = displayedRows.reduce((sum, r) => sum + Number(r.returned_amount || 0), 0);
+    const netGrand = Math.max(0, grand - returned);
     const paid = displayedRows.reduce((sum, r) => sum + Number(r.amount_paid || 0), 0);
     const due = displayedRows.reduce((sum, r) => sum + Number(r.balance_due || 0), 0);
     return {
@@ -188,6 +199,8 @@ const SalesReport = () => {
       total_taxable_amount: taxable,
       total_tax: tax,
       total_grand_total: grand,
+      total_returned: returned,
+      net_grand_total: netGrand,
       total_paid: paid,
       total_balance_due: due,
     };
@@ -195,9 +208,14 @@ const SalesReport = () => {
 
   const getSummaryCards = () => [
     { label: 'Total Invoices', value: String(summary.total_invoices) },
-    { label: 'Sales (Before GST)', value: fmt(summary.total_taxable_amount) },
+    { label: 'Gross Invoiced', value: fmt(summary.total_grand_total) },
+    {
+      label: 'Sales Returns',
+      value: summary.total_returned > 0 ? `-${fmt(summary.total_returned)}` : '₹0.00',
+      color: summary.total_returned > 0 ? 'text-rose-600' : undefined
+    },
+    { label: 'Net Sales Revenue', value: fmt(summary.net_grand_total) },
     { label: 'GST Collected', value: fmt(summary.total_tax) },
-    { label: 'Total Invoiced', value: fmt(summary.total_grand_total) },
     { label: 'Amount Received', value: fmt(summary.total_paid) },
     { label: 'Pending Dues', value: fmt(summary.total_balance_due) },
   ];

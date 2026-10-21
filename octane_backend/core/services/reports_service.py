@@ -58,10 +58,36 @@ class ReportsService:
         yesterday_invoices = Invoice.objects.filter(invoice_date=yesterday, invoice_status='POSTED')
         month_invoices = Invoice.objects.filter(invoice_date__gte=month_start, invoice_status='POSTED')
 
-        today_sales = today_invoices.aggregate(sum=Sum('taxable_amount'))['sum'] or Decimal('0.00')
+        today_sales_gross = today_invoices.aggregate(sum=Sum('taxable_amount'))['sum'] or Decimal('0.00')
         today_gross_sales = today_invoices.aggregate(sum=Sum('grand_total'))['sum'] or Decimal('0.00')
-        yesterday_sales = yesterday_invoices.aggregate(sum=Sum('taxable_amount'))['sum'] or Decimal('0.00')
-        month_sales = month_invoices.aggregate(sum=Sum('taxable_amount'))['sum'] or Decimal('0.00')
+
+        today_returns_movements = StockMovement.objects.filter(
+            movement_type='SALES_RETURN',
+            created_at__date=today
+        )
+        today_returns_taxable = sum(
+            Decimal(str(m.quantity)) * (m.unit_price if m.unit_price > Decimal('0.00') else Decimal('0.00'))
+            for m in today_returns_movements
+        )
+        today_returns_grand = sum(
+            Decimal(str(m.quantity)) * ((m.unit_price if m.unit_price > Decimal('0.00') else Decimal('0.00')) + 
+                ((m.unit_price * (m.product.gst_rate if m.product else Decimal('18.00'))) / Decimal('100')))
+            for m in today_returns_movements
+        )
+        today_returns_units = today_returns_movements.aggregate(sum=Sum('quantity'))['sum'] or 0
+
+        today_sales = max(Decimal('0.00'), today_sales_gross - today_returns_taxable)
+        today_net_gross_sales = max(Decimal('0.00'), today_gross_sales - today_returns_grand)
+
+        yesterday_sales_gross = yesterday_invoices.aggregate(sum=Sum('taxable_amount'))['sum'] or Decimal('0.00')
+        yesterday_returns = StockMovement.objects.filter(movement_type='SALES_RETURN', created_at__date=yesterday)
+        yesterday_returns_taxable = sum(Decimal(str(m.quantity)) * (m.unit_price if m.unit_price > Decimal('0.00') else Decimal('0.00')) for m in yesterday_returns)
+        yesterday_sales = max(Decimal('0.00'), yesterday_sales_gross - yesterday_returns_taxable)
+
+        month_sales_gross = month_invoices.aggregate(sum=Sum('taxable_amount'))['sum'] or Decimal('0.00')
+        month_returns = StockMovement.objects.filter(movement_type='SALES_RETURN', created_at__date__gte=month_start)
+        month_returns_taxable = sum(Decimal(str(m.quantity)) * (m.unit_price if m.unit_price > Decimal('0.00') else Decimal('0.00')) for m in month_returns)
+        month_sales = max(Decimal('0.00'), month_sales_gross - month_returns_taxable)
 
         if yesterday_sales > 0:
             today_vs_yesterday_pct = round(float((today_sales - yesterday_sales) / yesterday_sales * 100), 1)
@@ -110,7 +136,10 @@ class ReportsService:
             day_date = today - timedelta(days=i)
             day_name = day_date.strftime('%a')
             day_invs = Invoice.objects.filter(invoice_date=day_date, invoice_status='POSTED')
-            day_rev = day_invs.aggregate(sum=Sum('taxable_amount'))['sum'] or Decimal('0.00')
+            day_rev_gross = day_invs.aggregate(sum=Sum('taxable_amount'))['sum'] or Decimal('0.00')
+            day_returns = StockMovement.objects.filter(movement_type='SALES_RETURN', created_at__date=day_date)
+            day_ret_taxable = sum(Decimal(str(m.quantity)) * (m.unit_price if m.unit_price > Decimal('0.00') else Decimal('0.00')) for m in day_returns)
+            day_rev = max(Decimal('0.00'), day_rev_gross - day_ret_taxable)
             day_cnt = day_invs.count()
             seven_days_sales.append({
                 'day': day_name,
@@ -227,7 +256,11 @@ class ReportsService:
 
             # Quick indicators & comparisons
             'today_sales': float(today_sales),
+            'today_net_sales': float(today_sales),
             'today_gross_sales': float(today_gross_sales),
+            'today_sales_returns': float(today_returns_grand),
+            'today_returns_taxable': float(today_returns_taxable),
+            'today_returns_units': int(today_returns_units),
             'yesterday_sales': float(yesterday_sales),
             'today_vs_yesterday_pct': float(today_vs_yesterday_pct),
             'month_sales': float(month_sales),
@@ -360,6 +393,23 @@ class ReportsService:
                 getattr(inv, 'invoice_type', 'TAX_INVOICE') == 'NON_GST'
             )
 
+            ret_movements = StockMovement.objects.filter(
+                reference_type='SALES_RETURN',
+                reference_id=inv.invoice_number
+            )
+            returned_amount = sum(
+                Decimal(str(m.quantity)) * ((m.unit_price if m.unit_price > Decimal('0.00') else Decimal('0.00')) + 
+                    ((m.unit_price * (m.product.gst_rate if m.product else Decimal('18.00'))) / Decimal('100')))
+                for m in ret_movements
+            )
+            returned_taxable = sum(
+                Decimal(str(m.quantity)) * (m.unit_price if m.unit_price > Decimal('0.00') else Decimal('0.00'))
+                for m in ret_movements
+            )
+            has_returns = returned_amount > Decimal('0.00')
+            net_grand = max(Decimal('0.00'), inv.grand_total - returned_amount)
+            net_taxable = max(Decimal('0.00'), inv.taxable_amount - returned_taxable)
+
             rows.append({
                 'invoice_number': inv.invoice_number,
                 'invoice_date': str(inv.invoice_date),
@@ -373,6 +423,10 @@ class ReportsService:
                 'total_igst': float(inv.total_igst),
                 'total_tax': float(inv.total_tax),
                 'grand_total': float(inv.grand_total),
+                'returned_amount': float(returned_amount),
+                'has_returns': has_returns,
+                'net_grand_total': float(net_grand),
+                'net_taxable_amount': float(net_taxable),
                 'amount_paid': float(inv.total_paid_amount),
                 'balance_due': float(inv.balance_due_amount),
                 'payment_status': inv.payment_status,
@@ -383,24 +437,33 @@ class ReportsService:
             })
 
         # Aggregated summary
-        total_grand = sum(r['grand_total'] for r in rows)
-        total_paid = sum(r['amount_paid'] for r in rows)
-        total_balance = sum(r['balance_due'] for r in rows)
-        total_tax = sum(r['total_tax'] for r in rows)
-        total_taxable = sum(r['taxable_amount'] for r in rows)
-        total_discount = sum(r['discount_amount'] for r in rows)
+        total_grand = sum(Decimal(str(r['grand_total'])) for r in rows)
+        total_returned = sum(Decimal(str(r['returned_amount'])) for r in rows)
+        net_grand_total = max(Decimal('0.00'), total_grand - total_returned)
+
+        total_taxable = sum(Decimal(str(r['taxable_amount'])) for r in rows)
+        total_returned_taxable = sum(Decimal(str(r['taxable_amount'] - r['net_taxable_amount'])) for r in rows)
+        net_taxable_amount = max(Decimal('0.00'), total_taxable - total_returned_taxable)
+
+        total_paid = sum(Decimal(str(r['amount_paid'])) for r in rows)
+        total_balance = sum(Decimal(str(r['balance_due'])) for r in rows)
+        total_tax = sum(Decimal(str(r['total_tax'])) for r in rows)
+        total_discount = sum(Decimal(str(r['discount_amount'])) for r in rows)
 
         return {
             'start_date': str(start_date),
             'end_date': str(end_date),
             'total_invoices': len(rows),
             'summary': {
-                'total_taxable_amount': round(total_taxable, 2),
-                'total_discount': round(total_discount, 2),
-                'total_tax': round(total_tax, 2),
-                'total_grand_total': round(total_grand, 2),
-                'total_paid': round(total_paid, 2),
-                'total_balance_due': round(total_balance, 2),
+                'total_taxable_amount': round(float(total_taxable), 2),
+                'total_discount': round(float(total_discount), 2),
+                'total_tax': round(float(total_tax), 2),
+                'total_grand_total': round(float(total_grand), 2),
+                'total_returned': round(float(total_returned), 2),
+                'net_grand_total': round(float(net_grand_total), 2),
+                'net_taxable_amount': round(float(net_taxable_amount), 2),
+                'total_paid': round(float(total_paid), 2),
+                'total_balance_due': round(float(total_balance), 2),
             },
             'rows': rows,
         }

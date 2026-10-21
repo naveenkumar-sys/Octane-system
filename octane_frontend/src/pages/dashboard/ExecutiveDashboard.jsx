@@ -151,6 +151,9 @@ export const ExecutiveDashboard = ({ onNavigate }) => {
     if (!metrics) return {};
     return {
       todaySales: Number(metrics.today_sales || 0),
+      todayGrossSales: Number(metrics.today_gross_sales || 0),
+      todaySalesReturns: Number(metrics.today_sales_returns || 0),
+      todayReturnsCount: Number(metrics.today_returns_count || 0),
       todayVsYesterdayPct: metrics.today_vs_yesterday_pct ?? null,
       yesterdaySales: Number(metrics.yesterday_sales || 0),
       monthSales: Number(metrics.month_sales || 0),
@@ -470,7 +473,7 @@ export const ExecutiveDashboard = ({ onNavigate }) => {
         {/* CARD 1: Today's sales */}
         <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:shadow-md transition-all duration-200 flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold text-slate-500">Today&apos;s sales</span>
+            <span className="text-sm font-semibold text-slate-500">Today&apos;s Net Sales</span>
             <div className="w-8 h-8 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center font-bold">
               <ArrowUpRight className="w-4 h-4" />
             </div>
@@ -479,18 +482,26 @@ export const ExecutiveDashboard = ({ onNavigate }) => {
             <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
               {fmtRupee(m.todaySales)}
             </div>
-            <div className="flex items-center gap-1.5 mt-2 text-xs font-semibold text-emerald-600">
-              {m.todaySales > 0 ? (
-                <>
-                  <span className="text-sm leading-none">↑</span>
-                  <span>{fmtRupee(m.todaySales)} billed today</span>
-                </>
-              ) : (
-                <span className="text-slate-400 font-normal">
-                  Month-to-date: <strong className="text-slate-700 font-semibold">{fmtLakhs(m.monthSales)}</strong>
-                </span>
-              )}
-            </div>
+            {m.todaySalesReturns > 0 ? (
+              <div className="mt-2 text-[11px] font-bold text-amber-800 flex flex-wrap items-center gap-1 font-mono bg-amber-50/80 px-2 py-1 rounded-lg border border-amber-200">
+                <span className="text-slate-600 font-sans">Gross: {fmtRupee(m.todayGrossSales)}</span>
+                <span>•</span>
+                <span className="text-rose-600">↩ Ret: -{fmtRupee(m.todaySalesReturns)}</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 mt-2 text-xs font-semibold text-emerald-600">
+                {m.todaySales > 0 ? (
+                  <>
+                    <span className="text-sm leading-none">↑</span>
+                    <span>{fmtRupee(m.todaySales)} billed today</span>
+                  </>
+                ) : (
+                  <span className="text-slate-400 font-normal">
+                    Month-to-date: <strong className="text-slate-700 font-semibold">{fmtLakhs(m.monthSales)}</strong>
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
