@@ -778,8 +778,8 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         invoice.invoice_status = 'CANCELLED'
         invoice.total_paid_amount = Decimal('0.00')
         invoice.balance_due_amount = Decimal('0.00')
-        invoice.payment_status = 'UNPAID'
-        invoice.notes = f"[CANCELLED: {reason}] " + (invoice.notes or '')
+        current_notes = getattr(invoice, 'notes', '') or ''
+        invoice.notes = f"[CANCELLED: {reason}] {current_notes}".strip()
         invoice.save()
 
         return Response(
