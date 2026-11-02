@@ -4,7 +4,8 @@ from .models import (
     ProductCategory, Product, ServiceCategory, Service,
     SerialNumber, StockMovement, Invoice, InvoiceItem, Payment,
     Purchase, PurchaseItem, SupplierPayment, ExpenseCategory, Expense,
-    PartnerDrawings, PartnerSettlement, PartnerDeposit
+    PartnerDrawings, PartnerSettlement, PartnerDeposit,
+    Quotation
 )
 
 
@@ -146,4 +147,12 @@ class PartnerDepositAdmin(admin.ModelAdmin):
     list_display = ('deposit_number', 'partner', 'deposit_date', 'amount', 'payment_mode', 'deposit_type')
     list_filter = ('partner', 'payment_mode', 'deposit_type')
     search_fields = ('deposit_number', 'partner__name', 'reference_number', 'notes')
+
+
+@admin.register(Quotation)
+class QuotationAdmin(admin.ModelAdmin):
+    list_display = ('quotation_number', 'buyer_name', 'quotation_date', 'valid_until', 'grand_total', 'status')
+    list_filter = ('status', 'quotation_date')
+    search_fields = ('quotation_number', 'buyer_name', 'buyer_phone', 'buyer_email', 'buyer_gstin')
+
 

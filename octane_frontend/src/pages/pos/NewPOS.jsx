@@ -38,7 +38,7 @@ import StatusBadge from '../../components/ui/StatusBadge';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { LoadingState, ErrorState } from '../../components/ui/StateViews';
 
-export const NewPOS = () => {
+export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) => {
   const { user } = useAuth();
 
   // Data Masters
@@ -161,6 +161,71 @@ export const NewPOS = () => {
       setLoading(false);
     }
   };
+
+  // Convert Quotation into POS Sale
+  useEffect(() => {
+    if (initialQuotation && products.length > 0) {
+      if (initialQuotation.customer) {
+        const matched = customers.find((c) => c.id === initialQuotation.customer);
+        if (matched) setSelectedCustomer(matched);
+      } else if (initialQuotation.buyer_name) {
+        setSelectedCustomer({
+          id: null,
+          name: initialQuotation.buyer_name,
+          mobile: initialQuotation.buyer_phone || '',
+          gstin: initialQuotation.buyer_gstin || '',
+          billing_address_line1: initialQuotation.buyer_address || '',
+          city: initialQuotation.buyer_city || 'Bengaluru',
+        });
+      }
+
+      if (Array.isArray(initialQuotation.items)) {
+        const loadedCart = [];
+        initialQuotation.items.forEach((qItem) => {
+          const matchedProd = products.find(
+            (p) =>
+              (p.sku && p.sku === qItem.part_number) ||
+              (p.name && p.name.toLowerCase() === (qItem.description || '').toLowerCase())
+          );
+
+          if (matchedProd) {
+            loadedCart.push({
+              item_type: 'PRODUCT',
+              product_id: matchedProd.id,
+              product_name: matchedProd.name,
+              sku: matchedProd.sku || qItem.part_number,
+              brand: matchedProd.brand,
+              category_name: matchedProd.category_name,
+              specifications: matchedProd.specifications,
+              tracking_type: matchedProd.tracking_type,
+              current_stock: matchedProd.current_stock || 0,
+              selling_price: parseFloat(qItem.unit_price) || matchedProd.selling_price,
+              quantity: parseFloat(qItem.quantity) || 1,
+              gst_rate: parseFloat(qItem.gst_rate) ?? matchedProd.gst_rate,
+              hsn_sac: matchedProd.hsn_sac,
+              serial_numbers: [],
+            });
+          } else {
+            loadedCart.push({
+              item_type: 'SERVICE',
+              service_id: null,
+              product_name: qItem.description || 'Custom Item',
+              sku: qItem.part_number || '',
+              selling_price: parseFloat(qItem.unit_price) || 0,
+              quantity: parseFloat(qItem.quantity) || 1,
+              gst_rate: parseFloat(qItem.gst_rate) ?? 18,
+              hsn_sac: '998313',
+            });
+          }
+        });
+        if (loadedCart.length > 0) {
+          setCart(loadedCart);
+          toast.success(`Loaded items from Quotation #${initialQuotation.quotation_number}`);
+        }
+      }
+      if (onQuotationConsumed) onQuotationConsumed();
+    }
+  }, [initialQuotation, products, customers]);
 
   // Fetch available serial numbers for a serial-tracked product
   const fetchSerialsForProduct = async (productId) => {

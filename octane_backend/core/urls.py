@@ -51,11 +51,13 @@ from .views import (
     PurchaseReportView,
     InventoryReportView,
     GstReportView,
+    QuotationViewSet,
 )
 
 router = DefaultRouter()
 router.register(r'users', UserViewSet, basename='user')
 router.register(r'business-profile', BusinessProfileViewSet, basename='business-profile')
+router.register(r'quotations', QuotationViewSet, basename='quotation')
 router.register(r'customers', CustomerViewSet, basename='customer')
 router.register(r'suppliers', SupplierViewSet, basename='supplier')
 router.register(r'partners', PartnerViewSet, basename='partner')

@@ -13,6 +13,8 @@ export const CASHIER_ALLOWED_MODULES = [
   '/masters/customers',
   '/pos/new',
   '/pos/invoices',
+  '/pos/quotations',
+  '/pos/quotations/new',
   '/finance/receivables',
   '/settings',
   '/business-profile',

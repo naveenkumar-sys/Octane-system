@@ -12,7 +12,8 @@ from .models import (
     ProductCategory, CategoryAttribute, Brand, Product, ServiceCategory, Service,
     SerialNumber, StockMovement, Invoice, InvoiceItem, Payment,
     Purchase, PurchaseItem, SupplierPayment, ExpenseCategory, Expense,
-    PartnerDrawings, PartnerSettlement, PartnerDeposit
+    PartnerDrawings, PartnerSettlement, PartnerDeposit,
+    Quotation
 )
 from django.contrib.auth.models import User
 from .serializers import (
@@ -48,7 +49,8 @@ from .serializers import (
     ExpenseSerializer,
     PartnerDrawingsSerializer,
     PartnerSettlementSerializer,
-    PartnerDepositSerializer
+    PartnerDepositSerializer,
+    QuotationSerializer
 )
 from .services.stock_service import StockService
 from .services.tax_engine import TaxEngine
@@ -1697,4 +1699,38 @@ class GstReportView(APIView):
             end_date=request.query_params.get('end_date'),
         )
         return Response(report, status=status.HTTP_200_OK)
+
+
+class QuotationViewSet(viewsets.ModelViewSet):
+    """
+    API ViewSet for managing Quotations.
+    Completely isolated from Stock, Invoices, Ledgers, and P&L.
+    """
+    queryset = Quotation.objects.select_related('customer', 'created_by').all()
+    serializer_class = QuotationSerializer
+    pagination_class = None
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['customer', 'status', 'quotation_date']
+    search_fields = ['quotation_number', 'buyer_name', 'buyer_phone', 'buyer_email', 'buyer_gstin']
+    ordering_fields = ['quotation_date', 'grand_total', 'created_at']
+    ordering = ['-created_at']
+
+    @action(detail=False, methods=['get'])
+    def next_number(self, request):
+        """
+        Preview the next quotation number.
+        """
+        import re
+        last_quote = Quotation.objects.filter(quotation_number__regex=r'^OCT\d+$').order_by('-id').first()
+        if last_quote and last_quote.quotation_number:
+            try:
+                num = int(re.sub(r'^\D+', '', last_quote.quotation_number)) + 1
+                next_num = f"OCT{num:04d}"
+            except (ValueError, TypeError):
+                next_num = f"OCT{Quotation.objects.count() + 1:04d}"
+        else:
+            next_num = "OCT0001"
+        return Response({'next_quotation_number': next_num})
+
 

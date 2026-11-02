@@ -1,4 +1,7 @@
+import re
+import datetime
 from decimal import Decimal
+from django.utils import timezone
 from django.db import models
 from django.db.models import Sum, Q
 from django.core.validators import MinValueValidator, MaxValueValidator, RegexValidator
@@ -920,4 +923,123 @@ class PartnerDeposit(models.Model):
 
     def __str__(self):
         return f"Deposit {self.deposit_number} | {self.partner.name} | ₹{self.amount} ({self.deposit_type})"
+
+
+DEFAULT_QUOTATION_TERMS = (
+    "• Taxes extra as applicable at the time of billing\n"
+    "• Delivery: 1 week\n"
+    "• Validity: 7 days\n"
+    "• Payment: 15 days\n"
+    "• Order: Purchase Order should be in the name of Octane Systems"
+)
+
+
+class Quotation(models.Model):
+    """
+    Quotation & Proforma Proposal document.
+    Single table: Line items are stored directly in `items` JSONField.
+    Completely isolated from Stock Movements, Serial Numbers, Invoices, Ledgers, or P&L.
+    """
+    STATUS_CHOICES = (
+        ('DRAFT', 'Draft'),
+        ('SENT', 'Sent to Client'),
+        ('ACCEPTED', 'Accepted'),
+        ('REJECTED', 'Rejected'),
+        ('EXPIRED', 'Expired'),
+        ('CONVERTED', 'Converted to Invoice'),
+    )
+
+    quotation_number = models.CharField(max_length=50, unique=True, blank=True)
+    quotation_date = models.DateField(default=datetime.date.today)
+    validity_days = models.PositiveIntegerField(default=7)
+    valid_until = models.DateField(blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='DRAFT')
+
+    customer = models.ForeignKey(Customer, on_delete=models.SET_NULL, null=True, blank=True, related_name='quotations')
+
+    # Buyer Details
+    buyer_name = models.CharField(max_length=255)
+    buyer_address = models.TextField(blank=True, null=True)
+    buyer_city = models.CharField(max_length=100, default="Bengaluru", blank=True, null=True)
+    buyer_state = models.CharField(max_length=100, default="Karnataka", blank=True, null=True)
+    buyer_pincode = models.CharField(max_length=20, blank=True, null=True)
+    buyer_phone = models.CharField(max_length=30, blank=True, null=True)
+    buyer_email = models.EmailField(blank=True, null=True)
+    buyer_gstin = models.CharField(max_length=15, blank=True, null=True)
+
+    # Line items stored as JSON array:
+    # [
+    #   {
+    #     "sn": 1,
+    #     "part_number": "SKU-001",
+    #     "description": "Product / Service description",
+    #     "unit_price": 5000.00,
+    #     "quantity": 2,
+    #     "total_value": 10000.00,
+    #     "gst_rate": 18.0,
+    #     "gst_amount": 1800.00,
+    #     "total": 11800.00
+    #   }
+    # ]
+    items = models.JSONField(default=list, blank=True)
+
+    # Financial Summary
+    taxable_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    cgst_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    sgst_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    igst_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    total_tax = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    grand_total = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+
+    # Custom Terms & Banking info (matching reference quotation template)
+    terms_and_conditions = models.TextField(blank=True, default=DEFAULT_QUOTATION_TERMS)
+    bank_name = models.CharField(max_length=100, default="HDFC BANK", blank=True, null=True)
+    account_number = models.CharField(max_length=50, default="50100856647820", blank=True, null=True)
+    branch_ifsc = models.CharField(max_length=100, default="KORAMANGALA & HDFC0000053", blank=True, null=True)
+    account_holder = models.CharField(max_length=100, default="Sanjay", blank=True, null=True)
+
+    # Contact block
+    contact_person = models.CharField(max_length=150, default="JAGADEESH S", blank=True, null=True)
+    contact_phone = models.CharField(max_length=50, default="+91 95007 10234", blank=True, null=True)
+    contact_email = models.EmailField(default="support@octanesystems.in", blank=True, null=True)
+
+    # Optional linkage if converted to actual Invoice
+    converted_invoice = models.ForeignKey(Invoice, on_delete=models.SET_NULL, null=True, blank=True, related_name='source_quotations')
+    notes = models.TextField(blank=True, null=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['quotation_number']),
+            models.Index(fields=['quotation_date']),
+            models.Index(fields=['status']),
+            models.Index(fields=['buyer_name']),
+        ]
+
+    def __str__(self):
+        return f"Quotation {self.quotation_number} | {self.buyer_name} | ₹{self.grand_total}"
+
+    def save(self, *args, **kwargs):
+        if not self.quotation_number:
+            last_quote = Quotation.objects.filter(quotation_number__regex=r'^OCT\d+$').order_by('-id').first()
+            if last_quote and last_quote.quotation_number:
+                try:
+                    num = int(re.sub(r'^\D+', '', last_quote.quotation_number)) + 1
+                    self.quotation_number = f"OCT{num:04d}"
+                except (ValueError, TypeError):
+                    self.quotation_number = f"OCT{Quotation.objects.count() + 1:04d}"
+            else:
+                self.quotation_number = "OCT0001"
+
+        if not self.valid_until and self.quotation_date:
+            q_date = self.quotation_date
+            if hasattr(q_date, 'date'):
+                q_date = q_date.date()
+            self.valid_until = q_date + datetime.timedelta(days=self.validity_days or 7)
+
+        super().save(*args, **kwargs)
+
 

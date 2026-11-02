@@ -29,6 +29,8 @@ import OpeningBalance from './pages/inventory/OpeningBalance';
 import StockAdjustment from './pages/inventory/StockAdjustment';
 import NewPOS from './pages/pos/NewPOS';
 import InvoiceHistory from './pages/pos/InvoiceHistory';
+import QuotationForm from './pages/pos/QuotationForm';
+import QuotationList from './pages/pos/QuotationList';
 import CustomerReceivables from './pages/finance/CustomerReceivables';
 import Expenses from './pages/finance/Expenses';
 import PartnerLedger from './pages/finance/PartnerLedger';
@@ -211,6 +213,18 @@ const MODULE_CONFIG = {
     code: 'POS-INVOICES',
     icon: FileText,
   },
+  '/pos/quotations/new': {
+    title: 'Quotation Preparation',
+    description: 'Prepare and draft client price quotes and proforma estimates.',
+    code: 'POS-QUO-NEW',
+    icon: FileSpreadsheet,
+  },
+  '/pos/quotations': {
+    title: 'Quotations Directory',
+    description: 'Track, view, and print issued quotations and convert to sales.',
+    code: 'POS-QUOTATIONS',
+    icon: Receipt,
+  },
   // Finance
   '/finance/receivables': {
     title: 'Customer Receivables Ledger',
@@ -281,7 +295,7 @@ const MODULE_CONFIG = {
   },
 };
 
-const renderModuleContent = (currentRoute, onNavigate) => {
+const renderModuleContent = (currentRoute, onNavigate, extraProps = {}) => {
   switch (currentRoute) {
     case '/masters/products':
       return <ProductsMaster />;
@@ -323,9 +337,42 @@ const renderModuleContent = (currentRoute, onNavigate) => {
       return <StockAdjustment />;
     case '/pos':
     case '/pos/new':
-      return <NewPOS />;
+      return (
+        <NewPOS
+          initialQuotation={extraProps?.prefillQuotationForPOS}
+          onQuotationConsumed={() => extraProps?.setPrefillQuotationForPOS?.(null)}
+        />
+      );
     case '/pos/invoices':
       return <InvoiceHistory />;
+    case '/pos/quotations/new':
+      return (
+        <QuotationForm
+          quotationId={extraProps?.editingQuotationId}
+          onNavigateToList={() => extraProps?.handleNavigate('/pos/quotations')}
+          onSaved={() => {
+            extraProps?.setEditingQuotationId?.(null);
+            extraProps?.handleNavigate('/pos/quotations');
+          }}
+        />
+      );
+    case '/pos/quotations':
+      return (
+        <QuotationList
+          onNewQuotation={() => {
+            extraProps?.setEditingQuotationId?.(null);
+            extraProps?.handleNavigate('/pos/quotations/new');
+          }}
+          onEditQuotation={(id) => {
+            extraProps?.setEditingQuotationId?.(id);
+            extraProps?.handleNavigate('/pos/quotations/new');
+          }}
+          onConvertToInvoice={(quote) => {
+            extraProps?.setPrefillQuotationForPOS?.(quote);
+            extraProps?.handleNavigate('/pos/new');
+          }}
+        />
+      );
     case '/dashboard':
       return <ExecutiveDashboard onNavigate={onNavigate} />;
     case '/finance/receivables':
@@ -373,6 +420,8 @@ const getInitialRoute = () => {
 const MainContent = () => {
   const { user, isAdmin, loading } = useAuth();
   const [currentRoute, setCurrentRoute] = useState(getInitialRoute);
+  const [editingQuotationId, setEditingQuotationId] = useState(null);
+  const [prefillQuotationForPOS, setPrefillQuotationForPOS] = useState(null);
 
   const handleNavigate = (route) => {
     const [pathname] = (route || '').split('?');
@@ -431,7 +480,13 @@ const MainContent = () => {
   return (
     <AppLayout currentRoute={currentRoute} onNavigate={handleNavigate}>
       <ProtectedRoute currentRoute={currentRoute} onNavigate={handleNavigate}>
-        {renderModuleContent(currentRoute, handleNavigate)}
+        {renderModuleContent(currentRoute, handleNavigate, {
+          editingQuotationId,
+          setEditingQuotationId,
+          prefillQuotationForPOS,
+          setPrefillQuotationForPOS,
+          handleNavigate,
+        })}
       </ProtectedRoute>
     </AppLayout>
   );

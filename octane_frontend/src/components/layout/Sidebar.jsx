@@ -90,6 +90,8 @@ export const NAVIGATION_ITEMS = [
     items: [
       { id: '/pos/new', label: 'New Sale', path: '/pos/new', icon: ShoppingCart, badge: 'FAST', badgeColor: 'orange' },
       { id: '/pos/invoices', label: 'Invoice History', path: '/pos/invoices', icon: FileText },
+      { id: '/pos/quotations/new', label: 'Quotation Prep', path: '/pos/quotations/new', icon: FileSpreadsheet, badge: 'NEW', badgeColor: 'blue' },
+      { id: '/pos/quotations', label: 'Quotations', path: '/pos/quotations', icon: Receipt },
     ],
   },
   {

@@ -243,6 +243,15 @@ export const api = {
     apiRequest(`/invoices/${invoiceId}/cancel/`, { method: 'POST', body: JSON.stringify(data) }),
   getPayments: (params = '') => apiRequest(`/payments/${params}`),
   getAllPayments: (params = '') => apiRequest(`/finance/all-payments/${params}`),
+
+  // Quotations
+  getQuotations: (params = '') => apiRequest(`/quotations/${params}`),
+  getQuotation: (id) => apiRequest(`/quotations/${id}/`),
+  getNextQuotationNumber: () => apiRequest('/quotations/next_number/'),
+  createQuotation: (data) => apiRequest('/quotations/', { method: 'POST', body: JSON.stringify(data) }),
+  updateQuotation: (id, data) => apiRequest(`/quotations/${id}/`, { method: 'PUT', body: JSON.stringify(data) }),
+  patchQuotation: (id, data) => apiRequest(`/quotations/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteQuotation: (id) => apiRequest(`/quotations/${id}/`, { method: 'DELETE' }),
   getExpenses: (params = '') => apiRequest(`/expenses/${params}`),
   createExpense: (data) => apiRequest('/expenses/', { method: 'POST', body: JSON.stringify(data) }),
   updateExpense: (id, data) => apiRequest(`/expenses/${id}/`, { method: 'PUT', body: JSON.stringify(data) }),

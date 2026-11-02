@@ -119,14 +119,17 @@
     text-shadow: none !important;
   }
 
-  /* When the A4 print modal portal is active, completely collapse #root so background tables take 0px space */
+  /* When an A4 print modal portal is active, completely collapse #root so background tables take 0px space */
   body:has(#a4-print-modal-portal) #root,
-  #root:has(~ #a4-print-modal-portal) {
+  body:has(#a4-quotation-print-portal) #root,
+  #root:has(~ #a4-print-modal-portal),
+  #root:has(~ #a4-quotation-print-portal) {
     display: none !important;
   }
 
   /* Portal container starts at the very top of Page 1 */
-  #a4-print-modal-portal {
+  #a4-print-modal-portal,
+  #a4-quotation-print-portal {
     display: block !important;
     position: static !important;
     width: 210mm !important;
@@ -137,7 +140,8 @@
   }
 
   /* Print area resets zoom scaling and margin adjustments */
-  #a4-invoice-print-area {
+  #a4-invoice-print-area,
+  #a4-quotation-print-area {
     display: block !important;
     width: 210mm !important;
     margin: 0 !important;

@@ -8,7 +8,8 @@ from .models import (
     ProductCategory, CategoryAttribute, Brand, Product, ProductSpecification, ServiceCategory, Service,
     SerialNumber, StockMovement, Invoice, InvoiceItem, Payment,
     Purchase, PurchaseItem, SupplierPayment, ExpenseCategory, Expense,
-    PartnerDrawings, PartnerSettlement, PartnerDeposit
+    PartnerDrawings, PartnerSettlement, PartnerDeposit,
+    Quotation
 )
 
 
@@ -1016,6 +1017,62 @@ class PurchaseReturnItemInputSerializer(serializers.Serializer):
 class PurchaseReturnInputSerializer(serializers.Serializer):
     items = PurchaseReturnItemInputSerializer(many=True)
     notes = serializers.CharField(required=False, allow_blank=True, default='')
+
+
+class QuotationSerializer(serializers.ModelSerializer):
+    customer_name = serializers.CharField(source='customer.name', read_only=True)
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True)
+    quotation_number = serializers.CharField(required=False, allow_blank=True)
+
+    class Meta:
+        model = Quotation
+        fields = [
+            'id',
+            'quotation_number',
+            'quotation_date',
+            'validity_days',
+            'valid_until',
+            'status',
+            'customer',
+            'customer_name',
+            'buyer_name',
+            'buyer_address',
+            'buyer_city',
+            'buyer_state',
+            'buyer_pincode',
+            'buyer_phone',
+            'buyer_email',
+            'buyer_gstin',
+            'items',
+            'taxable_amount',
+            'cgst_amount',
+            'sgst_amount',
+            'igst_amount',
+            'total_tax',
+            'grand_total',
+            'terms_and_conditions',
+            'bank_name',
+            'account_number',
+            'branch_ifsc',
+            'account_holder',
+            'contact_person',
+            'contact_phone',
+            'contact_email',
+            'converted_invoice',
+            'notes',
+            'created_by',
+            'created_by_name',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'created_by']
+
+    def create(self, validated_data):
+        user = self.context.get('request').user if self.context.get('request') else None
+        if user and user.is_authenticated:
+            validated_data['created_by'] = user
+        return super().create(validated_data)
+
 
 
 
