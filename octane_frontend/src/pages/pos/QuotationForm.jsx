@@ -25,7 +25,7 @@ import {
 import { toast } from 'react-toastify';
 import { api } from '../../services/api';
 import { useBusinessProfile } from '../../context/BusinessProfileContext';
-import { A4QuotationPrintModal, A4QuotationSheet } from '../../components/quotation/A4QuotationPrint';
+import { A4QuotationPrintModal } from '../../components/quotation/A4QuotationPrint';
 import { downloadQuotationPdf } from '../../utils/quotationPdfExporter';
 
 const DEFAULT_TERMS = `• Taxes extra as applicable at the time of billing
@@ -386,7 +386,6 @@ export const QuotationForm = ({ quotationId = null, onNavigateToList, onSaved })
     } finally {
       setLoading(false);
       setIsGeneratingPdf(false);
-      setPdfDownloadQuote(null);
     }
   };
 
