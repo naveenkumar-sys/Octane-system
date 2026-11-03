@@ -19,9 +19,12 @@ import {
   Percent,
   Mail,
   ZoomIn,
-  Maximize2
+  Maximize2,
+  Download
 } from 'lucide-react';
+import { toast } from 'react-toastify';
 import { useBusinessProfile } from '../../context/BusinessProfileContext';
+import { downloadQuotationPdf } from '../../utils/quotationPdfExporter';
 import octaneLogo from '../../assets/octane_logo.png';
 import octaneSeal from '../../assets/octane_seal.png';
 
@@ -543,11 +546,25 @@ export const A4QuotationSheet = ({ quotation, company }) => {
 export const A4QuotationPrintModal = ({ isOpen, onClose, quotation }) => {
   const { businessProfile } = useBusinessProfile();
   const [viewMode, setViewMode] = useState('fit');
+  const [savingPdf, setSavingPdf] = useState(false);
 
   if (!isOpen || !quotation) return null;
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleSaveAsPdf = async () => {
+    setSavingPdf(true);
+    try {
+      const fileName = await downloadQuotationPdf(quotation, businessProfile);
+      toast.success(`Quotation PDF downloaded: ${fileName}`);
+    } catch (err) {
+      console.error('PDF generation failed:', err);
+      toast.error('Failed to save PDF. Please try Print -> Save as PDF.');
+    } finally {
+      setSavingPdf(false);
+    }
   };
 
   return createPortal(
@@ -584,6 +601,17 @@ export const A4QuotationPrintModal = ({ isOpen, onClose, quotation }) => {
           >
             <Printer size={15} />
             <span>Print Quotation</span>
+          </button>
+
+          {/* Save as PDF Button */}
+          <button
+            onClick={handleSaveAsPdf}
+            disabled={savingPdf}
+            className="flex items-center gap-1.5 px-4 py-2 bg-[#0C4A8A] hover:bg-[#0a3d72] disabled:opacity-60 disabled:cursor-not-allowed text-white font-black text-xs rounded-xl shadow-xs transition-all cursor-pointer"
+            title="Save quotation as a PDF file"
+          >
+            <Download size={15} />
+            <span>{savingPdf ? 'Saving…' : 'Save as PDF'}</span>
           </button>
 
           {/* Close Button */}

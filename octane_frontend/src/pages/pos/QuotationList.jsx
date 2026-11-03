@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   FileText,
   Search,
@@ -14,16 +14,20 @@ import {
   FileCheck,
   User,
   Filter,
-  DollarSign
+  DollarSign,
+  Download
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { api } from '../../services/api';
-import { A4QuotationPrintModal, formatDateDMY, formatINR } from '../../components/quotation/A4QuotationPrint';
+import { A4QuotationPrintModal, A4QuotationSheet, formatDateDMY, formatINR } from '../../components/quotation/A4QuotationPrint';
+import { downloadQuotationPdf } from '../../utils/quotationPdfExporter';
+import { useBusinessProfile } from '../../context/BusinessProfileContext';
 import StatusBadge from '../../components/ui/StatusBadge';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { LoadingState, ErrorState } from '../../components/ui/StateViews';
 
 export const QuotationList = ({ onNewQuotation, onEditQuotation, onConvertToInvoice }) => {
+  const { businessProfile } = useBusinessProfile();
   const [quotations, setQuotations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -35,6 +39,9 @@ export const QuotationList = ({ onNewQuotation, onEditQuotation, onConvertToInvo
   // Print Preview Modal State
   const [selectedQuoteForPrint, setSelectedQuoteForPrint] = useState(null);
   const [printModalOpen, setPrintModalOpen] = useState(false);
+
+  // Direct PDF Download State
+  const [downloadingPdfId, setDownloadingPdfId] = useState(null);
 
   // Delete Dialog State
   const [quoteToDelete, setQuoteToDelete] = useState(null);
@@ -107,6 +114,21 @@ export const QuotationList = ({ onNewQuotation, onEditQuotation, onConvertToInvo
       toast.error(err.message || 'Failed to delete quotation.');
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  // Direct Save as PDF — generates crisp vector PDF and downloads directly to local system
+  const handleDirectPdf = async (quote) => {
+    if (downloadingPdfId) return;
+    try {
+      setDownloadingPdfId(quote.id);
+      const fileName = await downloadQuotationPdf(quote, businessProfile);
+      toast.success(`PDF saved to your computer: ${fileName}`);
+    } catch (err) {
+      console.error('Direct PDF export error:', err);
+      toast.error('Failed to generate PDF. Please try Print -> Save as PDF.');
+    } finally {
+      setDownloadingPdfId(null);
     }
   };
 
@@ -310,6 +332,22 @@ export const QuotationList = ({ onNewQuotation, onEditQuotation, onConvertToInvo
                             <Printer size={15} />
                           </button>
 
+                          {/* Save as PDF */}
+                          <button
+                            onClick={() => handleDirectPdf(quote)}
+                            disabled={downloadingPdfId === quote.id}
+                            className="p-1.5 text-slate-500 hover:text-[#0C4A8A] hover:bg-blue-50 rounded-lg transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Save as PDF"
+                          >
+                            {downloadingPdfId === quote.id ? (
+                              <svg className="animate-spin" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                              </svg>
+                            ) : (
+                              <Download size={15} />
+                            )}
+                          </button>
+
                           {/* Edit */}
                           {onEditQuotation && (
                             <button
@@ -351,7 +389,7 @@ export const QuotationList = ({ onNewQuotation, onEditQuotation, onConvertToInvo
         </div>
       </div>
 
-      {/* 5. Print Modal */}
+      {/* 5. Print Preview Modal */}
       <A4QuotationPrintModal
         isOpen={printModalOpen}
         onClose={() => setPrintModalOpen(false)}

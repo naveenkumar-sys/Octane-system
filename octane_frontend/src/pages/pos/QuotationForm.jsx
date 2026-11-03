@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   FileText,
   User,
@@ -19,12 +19,14 @@ import {
   Eye,
   Percent,
   Package,
-  Lock
+  Lock,
+  Download
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { api } from '../../services/api';
 import { useBusinessProfile } from '../../context/BusinessProfileContext';
-import { A4QuotationPrintModal } from '../../components/quotation/A4QuotationPrint';
+import { A4QuotationPrintModal, A4QuotationSheet } from '../../components/quotation/A4QuotationPrint';
+import { downloadQuotationPdf } from '../../utils/quotationPdfExporter';
 
 const DEFAULT_TERMS = `• Taxes extra as applicable at the time of billing
 • Delivery: 1 week
@@ -44,6 +46,9 @@ export const QuotationForm = ({ quotationId = null, onNavigateToList, onSaved })
   // Print Preview Modal State
   const [printModalOpen, setPrintModalOpen] = useState(false);
   const [previewQuotationData, setPreviewQuotationData] = useState(null);
+
+  // Direct PDF Export State
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   // Form State
   const [quotationNumber, setQuotationNumber] = useState('');
@@ -329,7 +334,7 @@ export const QuotationForm = ({ quotationId = null, onNavigateToList, onSaved })
   };
 
   // Save Handler
-  const handleSave = async (shouldPrint = false) => {
+  const handleSave = async (actionType = false) => {
     if (!buyerName.trim()) {
       toast.error('Buyer Name or Company is required.');
       return null;
@@ -343,6 +348,7 @@ export const QuotationForm = ({ quotationId = null, onNavigateToList, onSaved })
 
     try {
       setLoading(true);
+      if (actionType === 'pdf') setIsGeneratingPdf(true);
       const payload = getPayload();
       let result;
 
@@ -354,7 +360,16 @@ export const QuotationForm = ({ quotationId = null, onNavigateToList, onSaved })
         toast.success(`Quotation #${result.quotation_number} created successfully!`);
       }
 
-      if (shouldPrint) {
+      if (actionType === 'pdf') {
+        const fileName = await downloadQuotationPdf(result, businessProfile);
+        toast.success(`Quotation PDF saved to your system: ${fileName}`);
+        setIsGeneratingPdf(false);
+        if (onSaved) {
+          onSaved(result);
+        } else if (onNavigateToList) {
+          onNavigateToList();
+        }
+      } else if (actionType === true) {
         setPreviewQuotationData(result);
         setPrintModalOpen(true);
       } else if (onSaved) {
@@ -370,6 +385,8 @@ export const QuotationForm = ({ quotationId = null, onNavigateToList, onSaved })
       return null;
     } finally {
       setLoading(false);
+      setIsGeneratingPdf(false);
+      setPdfDownloadQuote(null);
     }
   };
 
@@ -430,6 +447,23 @@ export const QuotationForm = ({ quotationId = null, onNavigateToList, onSaved })
           >
             <Save size={15} />
             <span>Save Draft</span>
+          </button>
+
+          <button
+            type="button"
+            disabled={loading}
+            onClick={() => handleSave('pdf')}
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-[#0C4A8A] hover:bg-[#0a3d72] text-white text-xs font-bold rounded-xl transition-all cursor-pointer disabled:opacity-50 shadow-xs"
+            title="Save quotation and download PDF immediately"
+          >
+            {isGeneratingPdf ? (
+              <svg className="animate-spin" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+              </svg>
+            ) : (
+              <Download size={15} />
+            )}
+            <span>{isGeneratingPdf ? 'Saving PDF...' : 'Save as PDF'}</span>
           </button>
 
           <button
