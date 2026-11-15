@@ -1699,6 +1699,7 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
                               '2 Years Brand',
                               '3 Years Brand',
                               '6 Months Store',
+                              '3 Months Store',
                               '1 Month Testing',
                               '7 Days Replacement',
                             ].map((preset) => {
