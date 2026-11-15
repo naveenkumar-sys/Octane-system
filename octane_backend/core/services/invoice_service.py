@@ -197,6 +197,7 @@ class InvoiceService:
                 serial_obj = SerialNumber.objects.filter(product=product_obj, serial_number=item_calc['serial_number']).first()
 
             desc = item_calc.get('description') or (product_obj.name if product_obj else (service_obj.service_name if service_obj else 'Item'))
+            warranty_val = str(item_calc.get('warranty') or '').strip()
             hsn_sac = item_calc.get('hsn_sac') or (product_obj.hsn_sac if product_obj else (service_obj.sac if service_obj else '852411'))
             unit = item_calc.get('unit') or (product_obj.unit if product_obj else 'NOS')
 
@@ -209,6 +210,7 @@ class InvoiceService:
                 service=service_obj,
                 serial_number=serial_obj,
                 description=desc,
+                warranty=warranty_val,
                 hsn_sac=hsn_sac,
                 quantity=item_calc['qty'],
                 unit=unit,

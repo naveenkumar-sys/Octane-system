@@ -17,7 +17,9 @@ import {
   Tag,
   DollarSign,
   RotateCcw,
-  Ban
+  Ban,
+  Download,
+  Shield
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -27,6 +29,7 @@ import FormModal from '../../components/ui/FormModal';
 import { LoadingState, EmptyState, ErrorState } from '../../components/ui/StateViews';
 import A4InvoicePrintModal from '../../components/invoice/A4InvoicePrint';
 import RecordPaymentModal from '../../components/forms/RecordPaymentModal';
+import { downloadInvoicePdf } from '../../utils/invoicePdfExporter';
 import { toast } from 'react-toastify';
 
 export const isInvoiceGst = (inv) => {
@@ -65,6 +68,21 @@ export const InvoiceHistory = () => {
   const [detailInvoice, setDetailInvoice] = useState(null);
   const [printInvoice, setPrintInvoice] = useState(null);
   const [recordPaymentInvoice, setRecordPaymentInvoice] = useState(null);
+  const [downloadingId, setDownloadingId] = useState(null);
+
+  const handleDownloadPdf = async (inv) => {
+    if (!inv) return;
+    setDownloadingId(inv.id);
+    try {
+      const fileName = await downloadInvoicePdf(inv);
+      toast.success(`Saved invoice PDF: ${fileName}`);
+    } catch (err) {
+      console.error('Failed to export PDF:', err);
+      toast.error('Failed to generate PDF. You can also use Print -> Save as PDF.');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   // Cancel / Void Modal State
   const [cancelInvoiceData, setCancelInvoiceData] = useState(null);
@@ -406,6 +424,14 @@ export const InvoiceHistory = () => {
               </button>
             )}
             <button
+              onClick={() => handleDownloadPdf(inv)}
+              disabled={downloadingId === inv.id}
+              className="p-1.5 text-slate-600 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+              title="Save as PDF (Direct Download)"
+            >
+              <Download size={15} className={downloadingId === inv.id ? 'animate-bounce text-orange-600' : ''} />
+            </button>
+            <button
               onClick={() => setPrintInvoice(inv)}
               className="p-1.5 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
               title="Print A4 Invoice"
@@ -725,6 +751,12 @@ export const InvoiceHistory = () => {
                           {item.serial_number && (
                             <div className="text-[10px] text-amber-700 font-mono">SN: {item.serial_number.serial_number || item.serial_number}</div>
                           )}
+                          {item.warranty && (
+                            <div className="text-[10px] text-blue-700 font-semibold flex items-center gap-1 mt-0.5">
+                              <Shield size={10} className="text-blue-600" />
+                              <span>Warranty: {item.warranty}</span>
+                            </div>
+                          )}
                         </td>
                         <td className="p-2.5 text-center text-slate-500">{item.hsn_sac || '-'}</td>
                         <td className="p-2.5 text-right font-bold text-slate-900">{item.quantity} {item.unit}</td>
@@ -803,15 +835,28 @@ export const InvoiceHistory = () => {
 
             {/* Bottom Actions */}
             <div className="pt-4 border-t border-slate-200 flex items-center justify-between gap-2">
-              <button
-                onClick={() => {
-                  setPrintInvoice(detailInvoice);
-                }}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-md cursor-pointer"
-              >
-                <Printer size={15} />
-                <span>Print A4 Invoice</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleDownloadPdf(detailInvoice)}
+                  disabled={downloadingId === detailInvoice?.id}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-md border border-slate-700 cursor-pointer disabled:opacity-50"
+                  title="Save and download invoice as PDF"
+                >
+                  <Download size={15} className={downloadingId === detailInvoice?.id ? 'animate-bounce text-orange-400' : 'text-orange-400'} />
+                  <span>{downloadingId === detailInvoice?.id ? 'Saving PDF...' : 'Save as PDF'}</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setPrintInvoice(detailInvoice);
+                  }}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-md cursor-pointer"
+                >
+                  <Printer size={15} />
+                  <span>Print A4 Invoice</span>
+                </button>
+              </div>
 
               <div className="flex items-center gap-2">
                 {detailInvoice.invoice_status !== 'CANCELLED' && (

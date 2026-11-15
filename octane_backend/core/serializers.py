@@ -622,6 +622,7 @@ class CreateInvoiceItemInputSerializer(serializers.Serializer):
     service_id = serializers.IntegerField(required=False, allow_null=True)
     serial_number = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     description = serializers.CharField(required=False, allow_blank=True, default='')
+    warranty = serializers.CharField(required=False, allow_blank=True, default='')
     hsn_sac = serializers.CharField(required=False, allow_blank=True, default='852411')
     qty = serializers.DecimalField(max_digits=10, decimal_places=2, default=1.0, min_value=Decimal('0.01'))
     unit = serializers.CharField(required=False, allow_blank=True, default='NOS')
@@ -721,6 +722,7 @@ class PurchaseSerializer(serializers.ModelSerializer):
 class CreatePurchaseItemInputSerializer(serializers.Serializer):
     product_id = serializers.IntegerField()
     description = serializers.CharField(required=False, allow_blank=True, default='')
+    warranty = serializers.CharField(required=False, allow_blank=True, default='')
     hsn_sac = serializers.CharField(required=False, allow_blank=True, default='852411')
     quantity = serializers.IntegerField(min_value=1)
     unit_cost = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=0)

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Wrench, Plus, Edit2, Power, Eye } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
@@ -38,7 +38,7 @@ export const ServicesMaster = () => {
     service_name: '',
     category: '',
     sac: '998313',
-    default_rate: '0.00',
+    default_rate: '',
     gst_rate: '18.00',
     description: '',
     is_active: true,
@@ -54,7 +54,7 @@ export const ServicesMaster = () => {
     setError(null);
     try {
       const [svcRes, catRes] = await Promise.all([
-        api.getServices(),
+        api.getServices('?ordering=-created_at'),
         api.getServiceCategories(),
       ]);
       setServices(Array.isArray(svcRes) ? svcRes : svcRes.results || []);
@@ -80,7 +80,7 @@ export const ServicesMaster = () => {
       service_name: service.service_name || '',
       category: service.category || '',
       sac: service.sac || '998313',
-      default_rate: service.default_rate ?? '0.00',
+      default_rate: service.default_rate !== null && service.default_rate !== undefined ? String(service.default_rate) : '',
       gst_rate: service.gst_rate ?? '18.00',
       description: service.description || '',
       is_active: service.is_active ?? true,
@@ -132,23 +132,32 @@ export const ServicesMaster = () => {
     }
   };
 
-  // Filtered Services
-  const filteredServices = services.filter((s) => {
-    const matchesSearch =
-      !searchQuery ||
-      s.service_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.sac?.toLowerCase().includes(searchQuery.toLowerCase());
+  // Filtered Services (Latest added first)
+  const filteredServices = useMemo(() => {
+    return services
+      .filter((s) => {
+        const matchesSearch =
+          !searchQuery ||
+          s.service_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          s.sac?.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesCategory =
-      filterValues.category === 'ALL' || String(s.category) === String(filterValues.category);
+        const matchesCategory =
+          filterValues.category === 'ALL' || String(s.category) === String(filterValues.category);
 
-    const matchesStatus =
-      filterValues.status === 'ALL' ||
-      (filterValues.status === 'ACTIVE' && s.is_active) ||
-      (filterValues.status === 'INACTIVE' && !s.is_active);
+        const matchesStatus =
+          filterValues.status === 'ALL' ||
+          (filterValues.status === 'ACTIVE' && s.is_active) ||
+          (filterValues.status === 'INACTIVE' && !s.is_active);
 
-    return matchesSearch && matchesCategory && matchesStatus;
-  });
+        return matchesSearch && matchesCategory && matchesStatus;
+      })
+      .sort((a, b) => {
+        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        if (dateB !== dateA) return dateB - dateA;
+        return (b.id || 0) - (a.id || 0);
+      });
+  }, [services, searchQuery, filterValues]);
 
   // Table Columns
   const columns = [
@@ -369,8 +378,10 @@ export const ServicesMaster = () => {
               step="0.01"
               min="0"
               required
+              placeholder="0.00"
               value={formData.default_rate}
               onChange={(e) => setFormData({ ...formData, default_rate: e.target.value })}
+              onFocus={(e) => e.target.select()}
               className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
             />
           </div>

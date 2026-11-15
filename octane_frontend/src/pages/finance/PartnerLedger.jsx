@@ -44,7 +44,7 @@ export const PartnerLedger = () => {
     mobile: '',
     email: '',
     ownership_percentage: '50.00',
-    initial_capital: '0.00',
+    initial_capital: '',
     is_active: true,
   });
 
@@ -153,7 +153,7 @@ export const PartnerLedger = () => {
       mobile: '',
       email: '',
       ownership_percentage: '50.00',
-      initial_capital: '0.00',
+      initial_capital: '',
       is_active: true,
     });
     setModalError(null);
@@ -167,7 +167,7 @@ export const PartnerLedger = () => {
       mobile: p.mobile || '',
       email: p.email || '',
       ownership_percentage: p.ownership_percentage || '50.00',
-      initial_capital: p.initial_capital || '0.00',
+      initial_capital: p.initial_capital ? String(p.initial_capital) : '',
       is_active: p.is_active !== undefined ? p.is_active : true,
     });
     setModalError(null);
@@ -757,6 +757,7 @@ export const PartnerLedger = () => {
                   placeholder="0.00"
                   value={partnerFormData.initial_capital}
                   onChange={(e) => setPartnerFormData({ ...partnerFormData, initial_capital: e.target.value })}
+                  onFocus={(e) => e.target.select()}
                   className={`w-full px-3 py-2 rounded-xl border text-xs font-mono font-extrabold focus:outline-none ${
                     editingPartner
                       ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed'

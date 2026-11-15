@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Package, Plus, Edit2, Power, Eye, Info } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
@@ -80,8 +80,8 @@ export const ProductsMaster = () => {
     model_number: '',
     hsn_sac: '852411',
     unit: 'NOS',
-    purchase_price: '0.00',
-    selling_price: '0.00',
+    purchase_price: '',
+    selling_price: '',
     gst_rate: '18.00',
     is_stock_enabled: true,
     tracking_type: 'QUANTITY',
@@ -108,7 +108,7 @@ export const ProductsMaster = () => {
     setError(null);
     try {
       const [prodRes, catRes] = await Promise.all([
-        api.getProducts(),
+        api.getProducts('?ordering=-created_at'),
         api.getProductCategories(),
       ]);
       setProducts(Array.isArray(prodRes) ? prodRes : prodRes.results || []);
@@ -138,8 +138,8 @@ export const ProductsMaster = () => {
       model_number: product.model_number || '',
       hsn_sac: product.hsn_sac || '852411',
       unit: product.unit || 'NOS',
-      purchase_price: product.purchase_price ?? '0.00',
-      selling_price: product.selling_price ?? '0.00',
+      purchase_price: product.purchase_price !== null && product.purchase_price !== undefined ? String(product.purchase_price) : '',
+      selling_price: product.selling_price !== null && product.selling_price !== undefined ? String(product.selling_price) : '',
       gst_rate: product.gst_rate ?? '18.00',
       is_stock_enabled: product.is_stock_enabled ?? true,
       tracking_type: product.tracking_type || 'QUANTITY',
@@ -200,28 +200,37 @@ export const ProductsMaster = () => {
     }
   };
 
-  // Filtered Products
-  const filteredProducts = products.filter((p) => {
-    const matchesSearch =
-      !searchQuery ||
-      p.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.sku?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.brand?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.hsn_sac?.toLowerCase().includes(searchQuery.toLowerCase());
+  // Filtered Products (Latest added first)
+  const filteredProducts = useMemo(() => {
+    return products
+      .filter((p) => {
+        const matchesSearch =
+          !searchQuery ||
+          p.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          p.sku?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          p.brand?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          p.hsn_sac?.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesCategory =
-      filterValues.category === 'ALL' || String(p.category) === String(filterValues.category);
+        const matchesCategory =
+          filterValues.category === 'ALL' || String(p.category) === String(filterValues.category);
 
-    const matchesStatus =
-      filterValues.status === 'ALL' ||
-      (filterValues.status === 'ACTIVE' && p.is_active) ||
-      (filterValues.status === 'INACTIVE' && !p.is_active);
+        const matchesStatus =
+          filterValues.status === 'ALL' ||
+          (filterValues.status === 'ACTIVE' && p.is_active) ||
+          (filterValues.status === 'INACTIVE' && !p.is_active);
 
-    const matchesTracking =
-      filterValues.tracking === 'ALL' || p.tracking_type === filterValues.tracking;
+        const matchesTracking =
+          filterValues.tracking === 'ALL' || p.tracking_type === filterValues.tracking;
 
-    return matchesSearch && matchesCategory && matchesStatus && matchesTracking;
-  });
+        return matchesSearch && matchesCategory && matchesStatus && matchesTracking;
+      })
+      .sort((a, b) => {
+        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        if (dateB !== dateA) return dateB - dateA;
+        return (b.id || 0) - (a.id || 0);
+      });
+  }, [products, searchQuery, filterValues]);
 
   // Table Columns
   const columns = [

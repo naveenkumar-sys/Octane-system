@@ -273,10 +273,39 @@ export const downloadQuotationPdf = async (quotation, company = {}) => {
     },
   });
 
-  const endY = doc.lastAutoTable.finalY + 5;
+  let endY = doc.lastAutoTable.finalY + 4;
   const colW = (pageWidth - margin * 2 - 6) / 3;
 
-  // 5. Bottom Section: Terms | Bank Details | Signatory
+  // 5. Optional Quotation Note Box (Prints directly above Terms & Conditions)
+  if (quotation.notes && String(quotation.notes).trim()) {
+    const noteText = String(quotation.notes).trim();
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    const noteLines = doc.splitTextToSize(noteText, pageWidth - margin * 2 - 8);
+    const noteBoxH = Math.max(9.5, 6 + noteLines.length * 3.5);
+
+    doc.setFillColor(244, 249, 253);
+    doc.setDrawColor(197, 223, 245);
+    doc.roundedRect(margin, endY, pageWidth - margin * 2, noteBoxH, 2, 2, 'FD');
+
+    // Blue Note Tab
+    doc.setFillColor(12, 74, 138);
+    doc.rect(margin, endY, 20, 4.2, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6.5);
+    doc.text('NOTE:', margin + 2, endY + 3.1);
+
+    // Note Text
+    doc.setTextColor(30, 41, 59);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.text(noteLines, margin + 2, endY + 7);
+
+    endY += noteBoxH + 3.5;
+  }
+
+  // 6. Bottom Section: Terms | Bank Details | Signatory
   // Box 1: Terms
   doc.setFillColor(244, 249, 253);
   doc.setDrawColor(197, 223, 245);

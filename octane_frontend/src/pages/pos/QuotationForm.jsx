@@ -90,6 +90,7 @@ export const QuotationForm = ({ quotationId = null, onNavigateToList, onSaved })
   const [contactPerson, setContactPerson] = useState('JAGADEESH S');
   const [contactPhone, setContactPhone] = useState('+91 95007 10234');
   const [contactEmail, setContactEmail] = useState('support@octanesystems.in');
+  const [showNotes, setShowNotes] = useState(false);
   const [notes, setNotes] = useState('');
 
   // 1. Fetch Masters & Quotation data if editing
@@ -137,7 +138,10 @@ export const QuotationForm = ({ quotationId = null, onNavigateToList, onSaved })
           if (quote.contact_person) setContactPerson(quote.contact_person);
           if (quote.contact_phone) setContactPhone(quote.contact_phone);
           if (quote.contact_email) setContactEmail(quote.contact_email);
-          if (quote.notes) setNotes(quote.notes);
+          if (quote.notes) {
+            setNotes(quote.notes);
+            setShowNotes(Boolean(quote.notes.trim()));
+          }
         } else {
           // New quotation: fetch next quotation number
           try {
@@ -329,7 +333,7 @@ export const QuotationForm = ({ quotationId = null, onNavigateToList, onSaved })
       contact_person: contactPerson,
       contact_phone: contactPhone,
       contact_email: contactEmail,
-      notes: notes,
+      notes: showNotes ? notes.trim() : '',
     };
   };
 
@@ -741,7 +745,8 @@ export const QuotationForm = ({ quotationId = null, onNavigateToList, onSaved })
                       min="0"
                       value={item.unit_price ?? ''}
                       onChange={(e) => handleUpdateItem(index, 'unit_price', e.target.value)}
-                      placeholder=""
+                      onFocus={(e) => e.target.select()}
+                      placeholder="0.00"
                       className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-slate-900 font-mono text-right focus:border-orange-500 focus:bg-white focus:outline-none"
                     />
                   </td>
@@ -809,7 +814,76 @@ export const QuotationForm = ({ quotationId = null, onNavigateToList, onSaved })
         </div>
       </div>
 
-      {/* 4. Terms, Bank Details & Footer Information (White Cards) */}
+      {/* 4. Quotation Note Toggle & Input (Above Terms & Conditions) */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-xs transition-all">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div
+              className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
+                showNotes ? 'bg-orange-600 text-white shadow-xs' : 'bg-slate-100 text-slate-500'
+              }`}
+            >
+              <FileText size={18} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                  Quotation Note / Remarks
+                </span>
+                {showNotes && notes.trim() && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    Active • Will print on bill
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Toggle ON to add custom remarks printed directly above the Terms & Conditions tab on the quotation bill.
+              </p>
+            </div>
+          </div>
+
+          {/* Toggle Switch Button */}
+          <div className="flex items-center gap-2.5">
+            <span className="text-xs font-bold text-slate-600">
+              {showNotes ? 'Note Enabled' : 'Note Disabled'}
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowNotes(!showNotes)}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                showNotes ? 'bg-orange-600' : 'bg-slate-300'
+              }`}
+              role="switch"
+              aria-checked={showNotes}
+              title={showNotes ? 'Click to disable note' : 'Click to enable note'}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                  showNotes ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+        </div>
+
+        {/* Collapsible Note Editor */}
+        {showNotes && (
+          <div className="pt-3 border-t border-slate-100 animate-in fade-in slide-in-from-top-1 duration-150">
+            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+              Note Text (Prints above Terms & Conditions tab on the bill)
+            </label>
+            <textarea
+              rows="2"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="e.g. Note: Validity 7 days. Pricing includes 1-year comprehensive on-site warranty and free courier delivery."
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-900 leading-relaxed focus:border-orange-500 focus:bg-white focus:outline-none transition-colors"
+            />
+          </div>
+        )}
+      </div>
+
+      {/* 5. Terms, Bank Details & Footer Information (White Cards) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         
         {/* Terms & Conditions */}

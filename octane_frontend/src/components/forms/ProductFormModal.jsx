@@ -80,8 +80,8 @@ export const ProductFormModal = ({
     model_number: '',
     hsn_sac: '852411',
     unit: 'NOS',
-    purchase_price: '0.00',
-    selling_price: '0.00',
+    purchase_price: '',
+    selling_price: '',
     gst_rate: '18.00',
     is_stock_enabled: true,
     tracking_type: 'QUANTITY',
@@ -151,8 +151,8 @@ export const ProductFormModal = ({
           model_number: editingProduct.model_number || '',
           hsn_sac: editingProduct.hsn_sac || '852411',
           unit: editingProduct.unit || 'NOS',
-          purchase_price: editingProduct.purchase_price ?? '0.00',
-          selling_price: editingProduct.selling_price ?? '0.00',
+          purchase_price: editingProduct.purchase_price !== null && editingProduct.purchase_price !== undefined ? String(editingProduct.purchase_price) : '',
+          selling_price: editingProduct.selling_price !== null && editingProduct.selling_price !== undefined ? String(editingProduct.selling_price) : '',
           gst_rate: editingProduct.gst_rate ?? '18.00',
           is_stock_enabled: editingProduct.is_stock_enabled ?? true,
           tracking_type: editingProduct.tracking_type || 'QUANTITY',
@@ -399,8 +399,10 @@ export const ProductFormModal = ({
             type="number"
             step="0.01"
             min="0"
+            placeholder="0.00"
             value={formData.purchase_price}
             onChange={(e) => setFormData({ ...formData, purchase_price: e.target.value })}
+            onFocus={(e) => e.target.select()}
             className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
           />
         </div>
@@ -412,8 +414,10 @@ export const ProductFormModal = ({
             step="0.01"
             min="0"
             required
+            placeholder="0.00"
             value={formData.selling_price}
             onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
+            onFocus={(e) => e.target.select()}
             className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
           />
         </div>

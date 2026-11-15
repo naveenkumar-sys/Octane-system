@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingBag, Plus, Trash2, Info, CheckCircle2, AlertCircle, Lock, Printer } from 'lucide-react';
+import { ShoppingBag, Plus, Trash2, Info, CheckCircle2, AlertCircle, Lock, Printer, Download } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
@@ -10,6 +10,7 @@ import ProductFormModal from '../../components/forms/ProductFormModal';
 import CategoryFormModal from '../../components/forms/CategoryFormModal';
 import BrandFormModal from '../../components/forms/BrandFormModal';
 import A4InvoicePrintModal from '../../components/invoice/A4InvoicePrint';
+import { downloadPurchasePdf } from '../../utils/purchasePdfExporter';
 
 export const NewPurchase = ({ onNavigate }) => {
   const { isAdmin } = useAuth();
@@ -24,6 +25,22 @@ export const NewPurchase = ({ onNavigate }) => {
 
   // A4 Invoice Print Modal State
   const [printInvoiceData, setPrintInvoiceData] = useState(null);
+  const [createdPurchaseData, setCreatedPurchaseData] = useState(null);
+  const [savingPdf, setSavingPdf] = useState(false);
+
+  const handleDownloadCreatedPdf = async () => {
+    if (!createdPurchaseData) return;
+    setSavingPdf(true);
+    try {
+      const fileName = await downloadPurchasePdf(createdPurchaseData);
+      toast.success(`Purchase PDF downloaded: ${fileName}`);
+    } catch (err) {
+      console.error('Failed to export PDF:', err);
+      toast.error('Failed to generate PDF. You can also use Print -> Save as PDF.');
+    } finally {
+      setSavingPdf(false);
+    }
+  };
 
   // Quick Create Modal States
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
@@ -52,7 +69,7 @@ export const NewPurchase = ({ onNavigate }) => {
       {
         payer: 'BUSINESS', // 'BUSINESS' or partner ID string
         payment_mode: 'CASH', // 'CASH' | 'UPI' | 'CARD' | 'BANK_TRANSFER'
-        amount: '0.00',
+        amount: '',
         reference_number: '',
         notes: '',
       },
@@ -105,7 +122,7 @@ export const NewPurchase = ({ onNavigate }) => {
       hsn_sac: '852411',
       unit: 'NOS',
       quantity: 1,
-      unit_cost: '0.00',
+      unit_cost: '',
       gst_rate: '18.00',
       serials: [''], // Array of serial strings matching quantity count
     },
@@ -288,7 +305,7 @@ export const NewPurchase = ({ onNavigate }) => {
         tracking_type: selectedProd.tracking_type || 'QUANTITY',
         hsn_sac: selectedProd.hsn_sac || '852411',
         unit: selectedProd.unit || 'NOS',
-        unit_cost: String(selectedProd.purchase_price ?? '0.00'),
+        unit_cost: selectedProd.purchase_price ? String(selectedProd.purchase_price) : '',
         gst_rate: String(selectedProd.gst_rate ?? '18.00'),
         quantity: currentQty,
         serials: Array(currentQty).fill(''),
@@ -349,7 +366,7 @@ export const NewPurchase = ({ onNavigate }) => {
         hsn_sac: '852411',
         unit: 'NOS',
         quantity: 1,
-        unit_cost: '0.00',
+        unit_cost: '',
         gst_rate: '18.00',
         serials: [''],
       },
@@ -527,6 +544,7 @@ export const NewPurchase = ({ onNavigate }) => {
       const res = await api.createPurchase(payload);
       const purchaseNum = res.purchase_number || 'entry';
       const msg = `Purchase ${purchaseNum} saved successfully! Stock and accounts updated.`;
+      setCreatedPurchaseData(res);
       setSuccessMessage(msg);
       toast.success(msg);
       setPrintInvoiceData(null); // Never auto-open print modal
@@ -547,7 +565,7 @@ export const NewPurchase = ({ onNavigate }) => {
           hsn_sac: '852411',
           unit: 'NOS',
           quantity: 1,
-          unit_cost: '0.00',
+          unit_cost: '',
           gst_rate: '18.00',
           serials: [''],
         },
@@ -591,15 +609,42 @@ export const NewPurchase = ({ onNavigate }) => {
             <CheckCircle2 size={18} className="text-emerald-600 flex-shrink-0" />
             <span>{successMessage}</span>
           </div>
-          {onNavigate && (
-            <button
-              type="button"
-              onClick={() => onNavigate('/purchases/history')}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer transition-all flex-shrink-0"
-            >
-              <span>View in Purchase History</span>
-            </button>
-          )}
+          <div className="flex items-center gap-2 flex-wrap">
+            {createdPurchaseData && (
+              <>
+                <button
+                  type="button"
+                  disabled={savingPdf}
+                  onClick={handleDownloadCreatedPdf}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl shadow-xs border border-slate-700 cursor-pointer transition-all disabled:opacity-50"
+                  title="Save purchase as PDF file"
+                >
+                  <Download size={14} className={savingPdf ? 'animate-bounce text-orange-400' : 'text-orange-400'} />
+                  <span>{savingPdf ? 'Saving PDF...' : 'Save as PDF'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPrintInvoiceData(createdPurchaseData)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 text-xs font-bold rounded-xl shadow-xs cursor-pointer transition-all"
+                  title="Print purchase voucher"
+                >
+                  <Printer size={14} className="text-orange-600" />
+                  <span>Print Voucher</span>
+                </button>
+              </>
+            )}
+
+            {onNavigate && (
+              <button
+                type="button"
+                onClick={() => onNavigate('/purchases/history')}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer transition-all flex-shrink-0"
+              >
+                <span>View in Purchase History</span>
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -903,12 +948,14 @@ export const NewPurchase = ({ onNavigate }) => {
                         step="0.01"
                         min="0"
                         required
+                        placeholder="0.00"
                         value={item.unit_cost}
                         onChange={(e) => {
                           const newItems = [...items];
                           newItems[idx].unit_cost = e.target.value;
                           setItems(newItems);
                         }}
+                        onFocus={(e) => e.target.select()}
                         className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500/30"
                       />
                     </div>
@@ -1062,7 +1109,8 @@ export const NewPurchase = ({ onNavigate }) => {
                             min="0"
                             value={pRow.amount}
                             onChange={(e) => updatePaymentRow(pIdx, 'amount', e.target.value)}
-                            placeholder="₹0.00"
+                            onFocus={(e) => e.target.select()}
+                            placeholder="0.00"
                             className="w-full px-2.5 py-2 rounded-lg bg-white border border-slate-200 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500/30"
                           />
                         </div>

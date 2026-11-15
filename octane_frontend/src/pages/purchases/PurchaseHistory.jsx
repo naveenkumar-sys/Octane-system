@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Receipt, Eye, CreditCard, RotateCcw, Plus, RefreshCw, Printer, Ban, AlertCircle } from 'lucide-react';
+import { Receipt, Eye, CreditCard, RotateCcw, Plus, RefreshCw, Printer, Ban, AlertCircle, Download } from 'lucide-react';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { toast } from 'react-toastify';
@@ -10,6 +10,7 @@ import FormModal from '../../components/ui/FormModal';
 import StatusBadge from '../../components/ui/StatusBadge';
 import { LoadingState, EmptyState, ErrorState } from '../../components/ui/StateViews';
 import A4InvoicePrintModal from '../../components/invoice/A4InvoicePrint';
+import { downloadPurchasePdf } from '../../utils/purchasePdfExporter';
 
 export const PurchaseHistory = ({ onSelectRoute }) => {
   const { isAdmin } = useAuth();
@@ -48,6 +49,21 @@ export const PurchaseHistory = ({ onSelectRoute }) => {
   const [returnReason, setReturnReason] = useState('');
   // A4 Invoice Print Modal State
   const [printInvoiceData, setPrintInvoiceData] = useState(null);
+  const [downloadingId, setDownloadingId] = useState(null);
+
+  const handleDownloadPdf = async (purchase) => {
+    if (!purchase) return;
+    setDownloadingId(purchase.id);
+    try {
+      const fileName = await downloadPurchasePdf(purchase);
+      toast.success(`Purchase PDF downloaded: ${fileName}`);
+    } catch (err) {
+      console.error('Failed to export PDF:', err);
+      toast.error('Failed to generate PDF. You can also use Print -> Save as PDF.');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   useEffect(() => {
     fetchPurchases();
@@ -70,7 +86,7 @@ export const PurchaseHistory = ({ onSelectRoute }) => {
   const handleOpenRecordPayment = (purchase) => {
     setPaymentPurchase(purchase);
     const balance = Math.max(0, parseFloat(purchase.total_amount) - parseFloat(purchase.paid_amount));
-    setPaymentAmount(balance > 0 ? String(balance.toFixed(2)) : '0.00');
+    setPaymentAmount(balance > 0 ? String(balance.toFixed(2)) : '');
     setPaymentMode('CASH');
     setPaymentDate(new Date().toISOString().split('T')[0]);
     setPaymentRefNumber('');
@@ -295,6 +311,15 @@ export const PurchaseHistory = ({ onSelectRoute }) => {
         return (
           <div className="flex items-center justify-end gap-1">
             <button
+              onClick={() => handleDownloadPdf(row)}
+              disabled={downloadingId === row.id}
+              className="p-1.5 rounded-lg text-slate-500 hover:text-orange-600 hover:bg-orange-50 transition-colors cursor-pointer disabled:opacity-50"
+              title="Save as PDF (Direct Download)"
+            >
+              <Download size={16} className={downloadingId === row.id ? 'animate-bounce text-orange-600' : ''} />
+            </button>
+
+            <button
               onClick={() => setPrintInvoiceData(row)}
               className="p-1.5 rounded-lg text-slate-500 hover:text-orange-600 hover:bg-orange-50 transition-colors cursor-pointer"
               title="Print A4 Tax Invoice"
@@ -447,6 +472,17 @@ export const PurchaseHistory = ({ onSelectRoute }) => {
                 )}
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleDownloadPdf(detailPurchase)}
+                  disabled={downloadingId === detailPurchase?.id}
+                  className="flex items-center gap-2 px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl shadow-xs border border-slate-700 cursor-pointer transition-all disabled:opacity-50"
+                  title="Save purchase voucher as PDF"
+                >
+                  <Download size={14} className={downloadingId === detailPurchase?.id ? 'animate-bounce text-orange-400' : 'text-orange-400'} />
+                  <span>{downloadingId === detailPurchase?.id ? 'Saving PDF...' : 'Save as PDF'}</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => setPrintInvoiceData(detailPurchase)}
@@ -623,8 +659,10 @@ export const PurchaseHistory = ({ onSelectRoute }) => {
                 step="0.01"
                 min="0.01"
                 required
+                placeholder="0.00"
                 value={paymentAmount}
                 onChange={(e) => setPaymentAmount(e.target.value)}
+                onFocus={(e) => e.target.select()}
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500/30"
               />
             </div>

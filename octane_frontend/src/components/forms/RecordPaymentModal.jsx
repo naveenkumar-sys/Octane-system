@@ -281,6 +281,7 @@ export const RecordPaymentModal = ({
                     max={maxAmount}
                     value={p.amount}
                     onChange={(e) => handlePaymentChange(pidx, 'amount', e.target.value)}
+                    onFocus={(e) => e.target.select()}
                     className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-mono font-extrabold text-slate-900 text-right focus:outline-none focus:ring-1 focus:ring-orange-500"
                     placeholder="0.00"
                   />

@@ -1,8 +1,11 @@
 import React, { useMemo, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Printer, X, Eye, FileText, Maximize2, ZoomIn } from 'lucide-react';
+import { Printer, X, Eye, FileText, Maximize2, ZoomIn, Download } from 'lucide-react';
+import { toast } from 'react-toastify';
 import { api } from '../../services/api';
 import { useBusinessProfile } from '../../context/BusinessProfileContext';
+import { downloadInvoicePdf } from '../../utils/invoicePdfExporter';
+import { downloadPurchasePdf } from '../../utils/purchasePdfExporter';
 import octaneLogo from '../../assets/octane_logo.png';
 import octaneSeal from '../../assets/octane_seal.png';
 
@@ -105,6 +108,10 @@ export const renderItemSpecsAndSku = (item) => {
     specs.push(`S/N: ${item.serial_number_str || item.serial_number_text || item.serial_numbers_text}`);
   }
 
+  if (item.warranty) {
+    specs.push(`Warranty: ${item.warranty}`);
+  }
+
   if (item.notes || item.description_extra) {
     specs.push(item.notes || item.description_extra);
   }
@@ -136,7 +143,7 @@ const A4SinglePageCopy = ({ copyType, invoice, company }) => {
   const documentTitle = invoice.title || (
     isPurchase
       ? (isCancelled ? 'PURCHASE VOUCHER (CANCELLED / VOID)' : 'PURCHASE VOUCHER / STOCK RECEIPT')
-      : (isCancelled ? (isNonGst ? 'ESTIMATE / CASH MEMO (CANCELLED / VOID)' : 'TAX INVOICE (CANCELLED / VOID)') : (isNonGst ? 'ESTIMATE / CASH MEMO' : 'TAX INVOICE'))
+      : (isCancelled ? (isNonGst ? 'INVOICE BILL (CANCELLED / VOID)' : 'TAX INVOICE (CANCELLED / VOID)') : (isNonGst ? 'INVOICE BILL' : 'TAX INVOICE'))
   );
 
   // Aggregated HSN/SAC summary
@@ -656,6 +663,7 @@ export const A4InvoicePrintModal = ({
   const [businessProfile, setBusinessProfile] = useState(null);
   const [viewMode, setViewMode] = useState('fit'); // 'fit' or 'actual'
   const [scale, setScale] = useState(0.72);
+  const [savingPdf, setSavingPdf] = useState(false);
   const { businessProfile: globalProfile } = useBusinessProfile();
 
   useEffect(() => {
@@ -691,6 +699,27 @@ export const A4InvoicePrintModal = ({
       }
     }
   }, [isOpen, autoPrint, defaultCopies]);
+
+  // Dynamic document title update so browser's native "Print -> Save as PDF"
+  // automatically defaults to the official naming format:
+  // Invoice_<InvoiceNumber>_<CustomerName>.pdf or Purchase_<PurchaseNumber>_<SupplierName>.pdf
+  useEffect(() => {
+    if (isOpen && invoiceData) {
+      const origTitle = document.title;
+      const isPur = Boolean(
+        invoiceData.is_purchase ||
+        invoiceData.document_type === 'PURCHASE' ||
+        (invoiceData.supplier_name && !invoiceData.customer_name)
+      );
+      const safeNum = String(invoiceData.invoice_number || invoiceData.purchase_number || invoiceData.number || '001').replace(/[^a-zA-Z0-9_\-]/g, '_');
+      const safeParty = String(invoiceData.customer_name || invoiceData.supplier_name || invoiceData.buyer_name || 'Client').replace(/[^a-zA-Z0-9_\-]/g, '_');
+      const prefix = isPur ? 'Purchase' : 'Invoice';
+      document.title = `${prefix}_${safeNum}_${safeParty}`;
+      return () => {
+        document.title = origTitle;
+      };
+    }
+  }, [isOpen, invoiceData]);
 
   // Listen for browser print events (e.g. user pressing Ctrl+P or clicking Print)
   // to ensure zoom scale is completely removed from the DOM before rendering print output
@@ -745,9 +774,32 @@ export const A4InvoicePrintModal = ({
 
   const handlePrint = () => {
     setViewMode('actual');
+    const safeNum = String(invoiceData.invoice_number || invoiceData.purchase_number || invoiceData.number || '001').replace(/[^a-zA-Z0-9_\-]/g, '_');
+    const safeParty = String(invoiceData.customer_name || invoiceData.supplier_name || invoiceData.buyer_name || 'Client').replace(/[^a-zA-Z0-9_\-]/g, '_');
+    const prefix = isPurchase ? 'Purchase' : 'Invoice';
+    document.title = `${prefix}_${safeNum}_${safeParty}`;
     setTimeout(() => {
       window.print();
     }, 100);
+  };
+
+  const handleSavePdf = async () => {
+    setSavingPdf(true);
+    try {
+      let fileName;
+      if (isPurchase) {
+        fileName = await downloadPurchasePdf(invoiceData, company);
+        toast.success(`Purchase PDF downloaded: ${fileName}`);
+      } else {
+        fileName = await downloadInvoicePdf(invoiceData, company);
+        toast.success(`Invoice PDF downloaded: ${fileName}`);
+      }
+    } catch (err) {
+      console.error('Failed to export PDF:', err);
+      toast.error('Failed to generate PDF. You can also use Print -> Save as PDF.');
+    } finally {
+      setSavingPdf(false);
+    }
   };
 
   return createPortal(
@@ -763,7 +815,7 @@ export const A4InvoicePrintModal = ({
           </div>
           <div>
             <div className="text-xs font-bold text-white flex items-center gap-1.5">
-              <span>Tax Invoice Print Preview</span>
+              <span>{isPurchase ? 'Purchase Voucher Preview' : 'Tax Invoice Print Preview'}</span>
               <span className="text-[10px] font-mono font-semibold bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">
                 A4 Sheet (210 × 297 mm)
               </span>
@@ -821,13 +873,25 @@ export const A4InvoicePrintModal = ({
             </button>
           </div>
 
+          {/* Save as PDF button */}
+          <button
+            type="button"
+            disabled={savingPdf}
+            onClick={handleSavePdf}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-white font-extrabold text-xs rounded-xl border border-slate-600 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+            title="Save and download official PDF file to local computer"
+          >
+            <Download size={15} className={savingPdf ? 'animate-bounce text-orange-400' : 'text-orange-400'} />
+            <span>{savingPdf ? 'Generating PDF...' : 'Save as PDF'}</span>
+          </button>
+
           {/* Print button */}
           <button
             onClick={handlePrint}
             className="flex items-center gap-1.5 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-orange-600/30 transition-all cursor-pointer"
           >
             <Printer size={15} />
-            <span>Print A4 Invoice</span>
+            <span>{isPurchase ? 'Print Voucher' : 'Print A4 Invoice'}</span>
           </button>
 
           {/* Close button */}

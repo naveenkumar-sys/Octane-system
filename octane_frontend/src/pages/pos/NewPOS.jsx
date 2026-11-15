@@ -17,6 +17,8 @@ import {
   Package,
   Layers,
   ArrowRight,
+  Shield,
+  ShieldCheck,
   ShieldAlert,
   Wrench,
   Phone,
@@ -27,7 +29,8 @@ import {
   Banknote,
   QrCode,
   Building2,
-  FileText
+  FileText,
+  Download
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useAuth } from '../../context/AuthContext';
@@ -37,6 +40,7 @@ import A4InvoicePrintModal from '../../components/invoice/A4InvoicePrint';
 import StatusBadge from '../../components/ui/StatusBadge';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { LoadingState, ErrorState } from '../../components/ui/StateViews';
+import { downloadInvoicePdf } from '../../utils/invoicePdfExporter';
 
 export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) => {
   const { user } = useAuth();
@@ -106,9 +110,29 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [businessProfile, setBusinessProfile] = useState(null);
   const [isClearCartConfirmOpen, setIsClearCartConfirmOpen] = useState(false);
+  const [savingPdf, setSavingPdf] = useState(false);
 
-  // Barcode input ref
+  const handleDownloadInvoicePdf = async (inv) => {
+    const target = inv || successInvoice;
+    if (!target) return;
+    setSavingPdf(true);
+    try {
+      const fileName = await downloadInvoicePdf(target, businessProfile);
+      toast.success(`Invoice PDF downloaded: ${fileName}`);
+    } catch (err) {
+      console.error('Failed to export PDF:', err);
+      toast.error('Failed to generate PDF. You can also use Print -> Save as PDF.');
+    } finally {
+      setSavingPdf(false);
+    }
+  };
+
+  // Barcode input ref & Catalog navigation refs
   const barcodeInputRef = useRef(null);
+  const searchInputRef = useRef(null);
+  const catalogListRef = useRef(null);
+  const catalogItemRefs = useRef([]);
+  const [selectedCatalogIndex, setSelectedCatalogIndex] = useState(0);
 
   useEffect(() => {
     fetchInitialPOSData();
@@ -241,6 +265,18 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
     }
   };
 
+  // Dynamic Category Counts for Category Filter Pills
+  const categoryCounts = useMemo(() => {
+    const counts = {
+      ALL: products.length + services.length,
+      SERVICES: services.length,
+    };
+    categories.forEach((cat) => {
+      counts[cat.id] = products.filter((p) => String(p.category) === String(cat.id)).length;
+    });
+    return counts;
+  }, [products, services, categories]);
+
   // Combined Filtered Catalog (Products + Services with Multi-Field & Serial Number Search)
   const filteredCatalog = useMemo(() => {
     const items = [];
@@ -253,28 +289,13 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
       if (sn.serial_number) productSerialsMap[pId].push(sn.serial_number);
     });
 
-    const isFiltered = selectedCategory && selectedCategory !== 'ALL';
-    let targetProdCatId = null;
-    let targetServCatId = null;
+    const isAll = selectedCategory === 'ALL' && posItemTypeFilter === 'ALL';
+    const isServiceCategory = selectedCategory === 'SERVICES' || posItemTypeFilter === 'SERVICES';
 
-    if (isFiltered) {
-      if (selectedCategory.startsWith('PROD_')) {
-        targetProdCatId = selectedCategory.replace('PROD_', '');
-      } else if (selectedCategory.startsWith('SERV_')) {
-        targetServCatId = selectedCategory.replace('SERV_', '');
-      } else {
-        // Fallback for legacy numeric string
-        targetProdCatId = selectedCategory;
-      }
-    }
-
-    // Add Products (if filter is ALL or PRODUCTS)
-    if (posItemTypeFilter === 'ALL' || posItemTypeFilter === 'PRODUCTS') {
+    // Add Products (if not strictly SERVICES view)
+    if (!isServiceCategory && (posItemTypeFilter === 'ALL' || posItemTypeFilter === 'PRODUCTS')) {
       products.forEach((p) => {
-        const stock = parseFloat(p.current_stock || p.stock || 0);
-        if (stock <= 0) return; // Do not show out-of-stock products
-
-        if (selectedCategory !== 'ALL' && String(p.category) !== String(selectedCategory)) {
+        if (!isAll && selectedCategory !== 'ALL' && String(p.category) !== String(selectedCategory)) {
           return;
         }
 
@@ -319,18 +340,15 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
           display_title: p.name,
           display_code: p.sku || 'SKU',
           display_price: parseFloat(p.selling_price || 0),
+          category_name: p.category_name || categories.find((c) => String(c.id) === String(p.category))?.name || 'Hardware',
           matching_serial: matchingSerialText,
         });
       });
     }
 
-    // Add Services (if filter is ALL or SERVICES)
-    if (posItemTypeFilter === 'ALL' || posItemTypeFilter === 'SERVICES') {
+    // Add Services (if ALL or SERVICES view)
+    if ((isAll || isServiceCategory) && (posItemTypeFilter === 'ALL' || posItemTypeFilter === 'SERVICES')) {
       services.forEach((s) => {
-        if (selectedCategory !== 'ALL' && String(s.category) !== String(selectedCategory)) {
-          return;
-        }
-
         if (productSearch.trim()) {
           const query = productSearch.toLowerCase().trim();
           const matchesName = (s.service_name || '').toLowerCase().includes(query);
@@ -346,14 +364,95 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
           ...s,
           item_type: 'SERVICE',
           display_title: s.service_name,
-          display_code: s.sac ? `SAC: ${s.sac}` : 'SERVICE',
+          display_code: s.sac ? `SAC ${s.sac}` : 'SERVICE',
           display_price: parseFloat(s.default_rate || 0),
+          category_name: s.category_name || 'Services',
         });
       });
     }
 
     return items;
   }, [products, services, posItemTypeFilter, selectedCategory, productSearch, availableSerialsList]);
+
+  // Keep selected item index clamped
+  useEffect(() => {
+    if (selectedCatalogIndex >= filteredCatalog.length && filteredCatalog.length > 0) {
+      setSelectedCatalogIndex(filteredCatalog.length - 1);
+    }
+  }, [filteredCatalog.length, selectedCatalogIndex]);
+
+  // Keyboard navigation: Up / Down arrow moves highlight, Enter adds, Esc clears, / focuses search
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Ignore if user is inside any modal dialog
+      if (
+        isCustomerLookupOpen ||
+        isCustomerModalOpen ||
+        isPrintModalOpen ||
+        isClearCartConfirmOpen
+      ) {
+        return;
+      }
+
+      const activeEl = document.activeElement;
+      const isInsideOtherInput =
+        activeEl &&
+        activeEl !== searchInputRef.current &&
+        activeEl !== barcodeInputRef.current &&
+        (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT');
+
+      if (isInsideOtherInput) return;
+
+      if (e.key === '/') {
+        if (activeEl !== searchInputRef.current) {
+          e.preventDefault();
+          searchInputRef.current?.focus();
+        }
+      } else if (e.key === 'ArrowDown') {
+        if (filteredCatalog.length > 0) {
+          e.preventDefault();
+          setSelectedCatalogIndex((prev) => {
+            const next = Math.min(filteredCatalog.length - 1, prev + 1);
+            catalogItemRefs.current[next]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            return next;
+          });
+        }
+      } else if (e.key === 'ArrowUp') {
+        if (filteredCatalog.length > 0) {
+          e.preventDefault();
+          setSelectedCatalogIndex((prev) => {
+            const next = Math.max(0, prev - 1);
+            catalogItemRefs.current[next]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            return next;
+          });
+        }
+      } else if (e.key === 'Enter') {
+        if (filteredCatalog[selectedCatalogIndex]) {
+          e.preventDefault();
+          handleAddToCart(filteredCatalog[selectedCatalogIndex]);
+        }
+      } else if (e.key === 'Escape') {
+        if (productSearch) {
+          e.preventDefault();
+          setProductSearch('');
+          setSelectedCatalogIndex(0);
+        } else {
+          searchInputRef.current?.blur();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    filteredCatalog,
+    selectedCatalogIndex,
+    isCustomerLookupOpen,
+    isCustomerModalOpen,
+    isPrintModalOpen,
+    isClearCartConfirmOpen,
+    productSearch,
+  ]);
 
   // Handle Quick Add to Cart (Product or Service, with optional pre-selected serial number)
   const handleAddToCart = async (item, specificSerial = null) => {
@@ -390,6 +489,8 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
           hsn_sac: item.sac || '998313',
           quantity: 1,
           selected_serials: [],
+          warranty: item.warranty || '',
+          is_warranty_open: false,
         };
         setCart((prev) => [...prev, newItem]);
         toast.success(`Added Service "${item.service_name}" to cart.`);
@@ -459,6 +560,8 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
         hsn_sac: item.hsn_sac || '852411',
         quantity: 1,
         selected_serials: initialSerials,
+        warranty: item.warranty || '',
+        is_warranty_open: false,
       };
 
       setCart((prev) => [...prev, newItem]);
@@ -600,6 +703,59 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
         setIsGstInvoice(true);
       }
     }
+  };
+
+  // Warranty management for cart items
+  const handleToggleWarranty = (index) => {
+    setCart((prev) => {
+      const updated = [...prev];
+      updated[index] = {
+        ...updated[index],
+        is_warranty_open: !updated[index].is_warranty_open,
+      };
+      return updated;
+    });
+  };
+
+  const handleSelectWarrantyPreset = (index, presetText) => {
+    setCart((prev) => {
+      const updated = [...prev];
+      updated[index] = {
+        ...updated[index],
+        warranty: presetText,
+        is_warranty_open: false,
+      };
+      return updated;
+    });
+    if (presetText) {
+      toast.success(`Warranty set: "${presetText}"`);
+    } else {
+      toast.info('Warranty removed.');
+    }
+  };
+
+  const handleWarrantyChange = (index, text) => {
+    setCart((prev) => {
+      const updated = [...prev];
+      updated[index] = {
+        ...updated[index],
+        warranty: text,
+      };
+      return updated;
+    });
+  };
+
+  const handleClearWarranty = (index) => {
+    setCart((prev) => {
+      const updated = [...prev];
+      updated[index] = {
+        ...updated[index],
+        warranty: '',
+        is_warranty_open: false,
+      };
+      return updated;
+    });
+    toast.info('Warranty removed.');
   };
 
   // Serial Selection for a Cart Item
@@ -794,6 +950,15 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
   const handleCompleteSale = async () => {
     setFormError(null);
 
+    // 0. Mandatory Customer Validation
+    if (!selectedCustomer) {
+      const err = 'Customer selection is mandatory. Please select or register a customer before completing this sale.';
+      setFormError(err);
+      toast.error(err);
+      setIsCustomerLookupOpen(true);
+      return;
+    }
+
     // 1. Cart Validation
     if (cart.length === 0) {
       const err = 'Cannot complete sale. Cart is empty!';
@@ -863,6 +1028,7 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
           item_type: 'SERVICE',
           service_id: item.service_id,
           description: item.product_name,
+          warranty: item.warranty || '',
           hsn_sac: item.hsn_sac || '998313',
           qty: item.quantity,
           unit: 'NOS',
@@ -878,6 +1044,7 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
             product_id: item.product_id,
             serial_number: sn,
             description: item.product_name,
+            warranty: item.warranty || '',
             hsn_sac: item.hsn_sac,
             qty: 1,
             unit: item.unit,
@@ -891,6 +1058,7 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
           item_type: 'PRODUCT',
           product_id: item.product_id,
           description: item.product_name,
+          warranty: item.warranty || '',
           hsn_sac: item.hsn_sac,
           qty: item.quantity,
           unit: item.unit,
@@ -971,53 +1139,59 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
   if (error) return <ErrorState message={error} onRetry={fetchInitialPOSData} />;
 
   return (
-    <div className="space-y-4 max-w-[1600px] mx-auto pb-10">
-      {/* 1. Terminal Top Bar */}
-      <div className="p-4 rounded-2xl border border-slate-200 bg-white shadow-2xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+    <div className="flex flex-col h-full space-y-2 overflow-hidden">
+      {/* 1. Terminal Top Bar (Compact High-Efficiency POS Header) */}
+      <div className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white shadow-2xs flex flex-wrap items-center justify-between gap-2.5 shrink-0">
         {/* Terminal Title & Active Status */}
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 text-white shadow-md shadow-orange-500/25 flex items-center justify-center flex-shrink-0">
-            <ShoppingCart size={22} className="stroke-[2.5]" />
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 text-white shadow-xs flex items-center justify-center shrink-0">
+            <ShoppingCart size={17} className="stroke-[2.5]" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-lg font-black text-slate-900 tracking-tight">POS Billing Terminal</h1>
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono font-bold uppercase rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <h1 className="text-sm font-black text-slate-900 tracking-tight">POS Billing Terminal</h1>
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.2 text-[9px] font-mono font-bold uppercase rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                LIVE TERMINAL
+                LIVE
               </span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Cashier: <strong className="text-slate-800 font-semibold">{user?.first_name || user?.username || 'Cashier'}</strong> • Active Store Session
+            <p className="text-[11px] text-slate-500 leading-tight">
+              Cashier: <strong className="text-slate-800 font-semibold">{user?.first_name || user?.username || 'Cashier'}</strong>
             </p>
           </div>
         </div>
 
         {/* Barcode Fast Scan & Customer Selection */}
-        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Barcode Scanner Input */}
           <form
             onSubmit={handleBarcodeSubmit}
-            className="flex items-center gap-2 bg-slate-50 hover:bg-slate-100/70 focus-within:bg-white px-3 py-2 rounded-xl border border-slate-200 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20 transition-all shadow-2xs"
+            className="flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100/70 focus-within:bg-white px-2.5 py-1 rounded-lg border border-slate-200 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20 transition-all shadow-2xs"
           >
-            <Barcode size={17} className="text-orange-600 flex-shrink-0" />
+            <Barcode size={15} className="text-orange-600 shrink-0" />
             <input
               ref={barcodeInputRef}
               type="text"
               placeholder="Scan Barcode / SKU..."
               value={barcodeInput}
               onChange={(e) => setBarcodeInput(e.target.value)}
-              className="w-44 text-xs font-mono font-bold text-slate-900 bg-transparent focus:outline-none uppercase placeholder:text-slate-400 placeholder:normal-case"
+              className="w-36 text-xs font-mono font-bold text-slate-900 bg-transparent focus:outline-none uppercase placeholder:text-slate-400 placeholder:normal-case"
             />
-            <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[9px] font-mono font-bold text-slate-400 bg-white border border-slate-200 rounded shadow-2xs">
-              ↵ Enter
+            <kbd className="hidden sm:inline-block px-1 py-0.2 text-[8.5px] font-mono font-bold text-slate-400 bg-white border border-slate-200 rounded shadow-2xs">
+              ↵
             </kbd>
           </form>
 
-          {/* Customer Selection Pill */}
-          <div className="flex items-center bg-slate-50 p-1 rounded-xl border border-slate-200 shadow-2xs">
-            <div className="flex items-center gap-1.5 pl-2 pr-1">
-              <Users size={15} className="text-slate-500" />
+          {/* Customer Selection Pill (Mandatory Entry) */}
+          <div
+            className={`flex items-center p-0.5 rounded-lg border shadow-2xs transition-all ${
+              !selectedCustomer
+                ? 'border-2 border-orange-500 bg-orange-50/70 ring-2 ring-orange-500/20'
+                : 'border-slate-200 bg-slate-50'
+            }`}
+          >
+            <div className="flex items-center gap-1 pl-2 pr-1">
+              <Users size={14} className={!selectedCustomer ? 'text-orange-600 animate-pulse' : 'text-slate-500'} />
               <select
                 value={selectedCustomer ? selectedCustomer.id : ''}
                 onChange={(e) => {
@@ -1028,9 +1202,11 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
                     setSelectedCustomer(cust || null);
                   }
                 }}
-                className="py-1 bg-transparent text-xs font-bold text-slate-900 focus:outline-none max-w-[170px] truncate cursor-pointer"
+                className={`py-0.5 bg-transparent text-xs font-bold focus:outline-none max-w-[150px] truncate cursor-pointer ${
+                  !selectedCustomer ? 'text-orange-800' : 'text-slate-900'
+                }`}
               >
-                <option value="">Walk-in Cash Customer</option>
+                <option value="">-- Customer Required * --</option>
                 {customers.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name} {c.mobile ? `(${c.mobile})` : ''}
@@ -1045,392 +1221,375 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
                 setLookupPhone(selectedCustomer?.mobile || '');
                 setIsCustomerLookupOpen(true);
               }}
-              className="px-2.5 py-1.5 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
-              title="Lookup customer by Phone Number"
+              className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer flex items-center gap-1 shadow-2xs ${
+                !selectedCustomer
+                  ? 'bg-orange-600 hover:bg-orange-700 text-white animate-pulse'
+                  : 'bg-slate-800 hover:bg-slate-700 text-white'
+              }`}
+              title="Lookup customer by Phone or Register New Profile"
             >
-              <Phone size={13} />
-              <span>Verify / + New</span>
+              <Phone size={12} />
+              <span>{!selectedCustomer ? 'Select Customer *' : 'Change / + New'}</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* Selected Customer Information Badge Banner */}
-      {selectedCustomer && (
-        <div className="p-3 bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl text-xs flex items-center justify-between animate-in fade-in">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-orange-500 text-white font-bold flex items-center justify-center text-xs">
-              {selectedCustomer.name.substring(0, 2).toUpperCase()}
+      {/* Last Sale Success Banner (Compact) */}
+      {successInvoice && !isPrintModalOpen && (
+        <div className="p-2 bg-emerald-50 border border-emerald-200 rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs shadow-xs animate-in fade-in shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold">
+              <CheckCircle2 size={13} />
             </div>
             <div>
-              <div className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
-                <span>{selectedCustomer.name}</span>
-                <span className="px-1.5 py-0.2 text-[9.5px] font-mono font-bold bg-orange-100 text-orange-800 rounded">
-                  {selectedCustomer.customer_type || 'INDIVIDUAL'}
-                </span>
-              </div>
-              <div className="text-[11px] text-slate-600 flex items-center gap-3 mt-0.5">
-                {selectedCustomer.mobile && <span>Ph: <strong>{selectedCustomer.mobile}</strong></span>}
-                {selectedCustomer.gstin && <span>GSTIN: <strong className="font-mono">{selectedCustomer.gstin}</strong></span>}
-                <span>State: <strong>{selectedCustomer.state_name || 'Karnataka'} ({selectedCustomer.state_code || '29'})</strong></span>
-              </div>
+              <span className="font-bold text-emerald-950">Sale Completed: </span>
+              <span className="font-mono font-extrabold text-emerald-800">
+                #{successInvoice.invoice_number || 'INV'}
+              </span>
+              <span className="text-emerald-700 ml-1 font-medium">
+                ({successInvoice.customer_name || 'Customer'} • ₹{parseFloat(successInvoice.grand_total || successInvoice.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })})
+              </span>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <button
-              onClick={() => {
-                setCustomerToEdit(selectedCustomer);
-                setInitialMobileForNew('');
-                setIsCustomerModalOpen(true);
-              }}
-              className="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold rounded-lg text-xs transition-colors flex items-center gap-1 cursor-pointer"
-              title="Edit Customer Profile"
+              type="button"
+              disabled={savingPdf}
+              onClick={() => handleDownloadInvoicePdf(successInvoice)}
+              className="flex items-center gap-1 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-lg text-xs shadow-xs border border-slate-700 transition-all cursor-pointer disabled:opacity-50"
+              title="Save invoice as PDF"
             >
-              <Edit2 size={13} />
-              <span>Edit Details</span>
+              <Download size={12} className={savingPdf ? 'animate-bounce text-orange-400' : 'text-orange-400'} />
+              <span>{savingPdf ? 'Saving...' : 'Save PDF'}</span>
             </button>
             <button
-              onClick={() => setSelectedCustomer(null)}
-              className="text-xs font-bold text-orange-700 hover:text-orange-900 underline cursor-pointer"
+              type="button"
+              onClick={() => setIsPrintModalOpen(true)}
+              className="flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-slate-50 text-slate-800 font-bold rounded-lg text-xs border border-slate-300 shadow-xs transition-all cursor-pointer"
+              title="Open full print preview"
             >
-              Switch to Walk-in
+              <Printer size={12} className="text-orange-600" />
+              <span>Print A4</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSuccessInvoice(null)}
+              className="p-1 text-slate-400 hover:text-slate-600 rounded cursor-pointer"
+              title="Dismiss"
+            >
+              <X size={13} />
             </button>
           </div>
         </div>
       )}
 
-      {/* 2. Main Terminal Layout Grid (Catalog Left 60% • Cart Right 40%) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+      {/* 2. Main Terminal Layout Grid (Catalog Left 60% • Cart Right 40% - Single Screen Viewport) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-2.5 flex-1 min-h-0 overflow-hidden">
 
-        {/* LEFT COLUMN: Product & Service Catalog (7 Cols on LG) */}
-        <div className="lg:col-span-7 space-y-4">
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs space-y-3.5">
-            {/* Search & Filter Controls */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-              {/* Product / Service Search Input */}
-              <div className="relative flex-1">
-                <Search size={16} className="absolute left-3.5 top-3 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search by name, serial number / IMEI, SKU, brand, specs..."
-                  value={productSearch}
-                  onChange={(e) => setProductSearch(e.target.value)}
-                  className="w-full pl-9 pr-8 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all placeholder:text-slate-400"
-                />
-                {productSearch && (
-                  <button
-                    onClick={() => setProductSearch('')}
-                    className="absolute right-2.5 top-2.5 p-0.5 text-slate-400 hover:text-slate-600 rounded-full"
-                  >
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
-
-              {/* Type Filter Pills (ALL | PRODUCTS | SERVICES) */}
-              <div className="flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200 text-xs flex-shrink-0">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPosItemTypeFilter('ALL');
-                    setSelectedCategory('ALL');
-                  }}
-                  className={`px-3 py-1.5 font-bold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-                    posItemTypeFilter === 'ALL'
-                      ? 'bg-white text-orange-600 shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <span>All</span>
-                  <span className={`px-1.5 py-0.2 rounded-full text-[9.5px] font-mono ${posItemTypeFilter === 'ALL' ? 'bg-orange-50 text-orange-700' : 'bg-slate-200 text-slate-600'}`}>
-                    {products.filter(p => parseFloat(p.current_stock || p.stock || 0) > 0).length + services.length}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPosItemTypeFilter('PRODUCTS');
-                    setSelectedCategory('ALL');
-                  }}
-                  className={`px-3 py-1.5 font-bold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-                    posItemTypeFilter === 'PRODUCTS'
-                      ? 'bg-white text-orange-600 shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <Package size={13} />
-                  <span>Products</span>
-                  <span className={`px-1.5 py-0.2 rounded-full text-[9.5px] font-mono ${posItemTypeFilter === 'PRODUCTS' ? 'bg-orange-50 text-orange-700' : 'bg-slate-200 text-slate-600'}`}>
-                    {products.filter(p => parseFloat(p.current_stock || p.stock || 0) > 0).length}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPosItemTypeFilter('SERVICES');
-                    setSelectedCategory('ALL');
-                  }}
-                  className={`px-3 py-1.5 font-bold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-                    posItemTypeFilter === 'SERVICES'
-                      ? 'bg-white text-indigo-600 shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <Wrench size={13} />
-                  <span>Services</span>
-                  <span className={`px-1.5 py-0.2 rounded-full text-[9.5px] font-mono ${posItemTypeFilter === 'SERVICES' ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-200 text-slate-600'}`}>
-                    {services.length}
-                  </span>
-                </button>
-              </div>
-
-              {/* Category Dropdown */}
-              {posItemTypeFilter !== 'SERVICES' && (
-                <select
-                  id="pos-category-filter"
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 cursor-pointer flex-shrink-0"
-                >
-                  <option value="ALL">All Categories</option>
-                  {categories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-
-            {/* Catalog Grid */}
-            {filteredCatalog.length === 0 ? (
-              <div className="py-14 text-center text-slate-500 text-xs bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
-                <Package size={36} className="mx-auto text-slate-300 mb-2 stroke-[1.5]" />
-                <div className="font-extrabold text-slate-700 text-sm">No items found</div>
-                <p className="text-[11.5px] text-slate-400 mt-1 max-w-sm mx-auto">
-                  {productSearch
-                    ? 'No products or services match your search query.'
-                    : selectedCategory !== 'ALL'
-                    ? 'No items match the selected category in this view.'
-                    : 'No active items available.'}
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-3.5 max-h-[620px] overflow-y-auto p-1.5 pt-2.5 pb-2.5 pr-2">
-                {filteredCatalog.map((item) => {
-                  const isService = item.item_type === 'SERVICE';
-                  const stock = isService ? 999 : parseFloat(item.current_stock || item.stock || 0);
-
-                  const inCartItem = cart.find((c) =>
-                    item.item_type === 'SERVICE'
-                      ? c.item_type === 'SERVICE' && c.service_id === item.id
-                      : c.item_type === 'PRODUCT' && c.product_id === item.id
-                  );
-                  const inCartQty = inCartItem ? inCartItem.quantity : 0;
-
-                  return (
-                    <div
-                      key={`${item.item_type}-${item.id}`}
-                      onClick={() => handleAddToCart(item)}
-                      className={`p-3.5 bg-white rounded-2xl border transition-all flex flex-col justify-between group relative select-none cursor-pointer ${
-                        inCartQty > 0
-                          ? 'border-orange-400 ring-2 ring-orange-500/20 bg-orange-50/15 shadow-xs'
-                          : isService
-                            ? 'border-slate-200 hover:border-indigo-400 hover:shadow-md hover:-translate-y-0.5'
-                            : 'border-slate-200 hover:border-orange-400 hover:shadow-md hover:-translate-y-0.5'
-                      }`}
-                    >
-                      <div>
-                        {/* Header: Item Type & Stock/SAC Badge */}
-                        <div className="flex items-center justify-between gap-1.5 mb-1.5">
-                          {isService ? (
-                            <span className="px-2 py-0.5 rounded-md text-[9.5px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1">
-                              <Wrench size={10} /> SERVICE
-                            </span>
-                          ) : (
-                            <span className="px-2 py-0.5 rounded-md text-[9.5px] font-mono font-bold uppercase bg-slate-100 text-slate-700 border border-slate-200 truncate max-w-[120px]">
-                              {item.brand_name || item.brand || 'PRODUCT'}
-                            </span>
-                          )}
-
-                          {isService ? (
-                            <span className="px-2 py-0.5 rounded-md text-[9.5px] font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                              SAC {item.sac || '998313'}
-                            </span>
-                          ) : (
-                            <span className={`px-2 py-0.5 rounded-md text-[9.5px] font-mono font-bold border flex items-center gap-1 ${
-                              stock > 5
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                : stock > 0
-                                ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                : 'bg-rose-50 text-rose-700 border-rose-200'
-                            }`}>
-                              <span className={`w-1.5 h-1.5 rounded-full ${stock > 5 ? 'bg-emerald-500' : stock > 0 ? 'bg-amber-500' : 'bg-rose-500'}`} />
-                              {stock > 0 ? `Stock: ${stock} ${item.unit || 'NOS'}` : 'Stock: 0 NOS'}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Item Title */}
-                        <h4 className={`font-bold text-xs text-slate-900 line-clamp-2 min-h-[2.2rem] leading-snug transition-colors ${
-                          isService ? 'group-hover:text-indigo-600' : 'group-hover:text-orange-600'
-                        }`}>
-                          {item.display_title}
-                        </h4>
-
-                        {/* Specs / Description Pill (Uniform Height, No Clipping, Serial Match Badge) */}
-                        <div className="mt-1.5 min-h-[2rem] overflow-hidden text-[10px] leading-snug">
-                          {item.matching_serial ? (
-                            <p className="text-amber-800 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg truncate font-mono font-bold flex items-center gap-1">
-                              <Tag size={10} className="shrink-0 text-amber-600" />
-                              <span className="truncate">Matches S/N: {item.matching_serial}</span>
-                            </p>
-                          ) : item.specifications_text || item.description ? (
-                            <p className="text-slate-600 bg-slate-50 border border-slate-100 px-2 py-1 rounded-lg line-clamp-2">
-                              {item.specifications_text || item.description}
-                            </p>
-                          ) : (
-                            <p className="text-slate-400 italic px-1 py-1">
-                              {isService ? 'Standard Service' : (item.category_name || 'Hardware Component')}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Footer: Price & Add Button (Stacked row layout - zero collision, zero price clipping) */}
-                      <div className="mt-3 pt-2.5 border-t border-slate-100 space-y-2">
-                        {/* Row 1: SKU on left, Full Price on right */}
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-[10px] font-mono text-slate-400 truncate max-w-[50%]" title={item.sku}>
-                            {isService ? `GST ${item.gst_rate || 18}%` : (item.sku || 'SKU')}
-                          </span>
-                          <span className="text-sm font-black text-slate-900 font-mono tracking-tight shrink-0 text-right">
-                            ₹{item.display_price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                          </span>
-                        </div>
-
-                        {/* Row 2: Full-width tactile action button */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleAddToCart(item);
-                          }}
-                          className={`w-full py-1.5 px-3 rounded-xl font-bold text-xs shadow-2xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                            inCartQty > 0
-                              ? 'bg-orange-600 hover:bg-orange-700 text-white shadow-orange-500/25 ring-2 ring-orange-500/30'
-                              : isService
-                                ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/20'
-                                : 'bg-orange-600 hover:bg-orange-700 text-white shadow-orange-600/20'
-                          }`}
-                        >
-                          {inCartQty > 0 ? (
-                            <>
-                              <Check size={13} className="stroke-[3] shrink-0" />
-                              <span className="whitespace-nowrap font-extrabold">Added to Bill ({inCartQty})</span>
-                            </>
-                          ) : (
-                            <>
-                              <Plus size={13} className="stroke-[3] shrink-0" />
-                              <span className="whitespace-nowrap font-bold">+ Add to Bill</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+        {/* LEFT COLUMN: Product & Service Catalog (7 Cols on LG) - High-Density POS Kiosk Layout */}
+        <div className="lg:col-span-7 flex flex-col h-full min-h-0 bg-white p-3 rounded-2xl border border-slate-200/90 shadow-2xs space-y-2 overflow-hidden">
+          {/* 1. Top Search Bar */}
+          <div className="relative flex items-center w-full rounded-xl border-2 border-orange-500 bg-white px-3 py-1.5 sm:py-2 shadow-xs transition-all focus-within:ring-2 focus-within:ring-orange-500/10 shrink-0">
+            <Search size={17} className="text-[#6C5CE7] stroke-[2.5] shrink-0" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder='Type name, SKU or scan barcode...  e.g. "iph 17" or "apple charger"'
+              value={productSearch}
+              onChange={(e) => {
+                setProductSearch(e.target.value);
+                setSelectedCatalogIndex(0);
+              }}
+              className="w-full bg-transparent text-slate-800 placeholder:text-slate-400 placeholder:font-normal font-medium text-xs sm:text-sm focus:outline-none pl-2.5 pr-2"
+            />
+            {productSearch && (
+              <button
+                type="button"
+                onClick={() => {
+                  setProductSearch('');
+                  setSelectedCatalogIndex(0);
+                }}
+                className="p-0.5 text-slate-400 hover:text-slate-600 rounded-full mr-1 cursor-pointer"
+                title="Clear search (Esc)"
+              >
+                <X size={14} />
+              </button>
             )}
+            <span className="hidden sm:flex items-center justify-center w-5 h-5 rounded bg-slate-100 text-slate-400 font-mono text-[10px] font-semibold border border-slate-200 select-none">
+              /
+            </span>
           </div>
+
+          {/* 2. Category Filter Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 shrink-0">
+            {/* 'All' Pill */}
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedCategory('ALL');
+                setPosItemTypeFilter('ALL');
+                setSelectedCatalogIndex(0);
+              }}
+              className={`px-3 py-1 rounded-full font-bold text-xs whitespace-nowrap transition-all cursor-pointer flex items-center gap-1 ${
+                selectedCategory === 'ALL' && posItemTypeFilter === 'ALL'
+                  ? 'bg-orange-600 text-white shadow-2xs'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+            >
+              <span>All</span>
+              <span className="font-mono text-[11px] opacity-90">{categoryCounts.ALL}</span>
+            </button>
+
+            {/* Dynamic Product Categories */}
+            {categories.map((cat) => {
+              const isCatActive = posItemTypeFilter !== 'SERVICES' && String(selectedCategory) === String(cat.id);
+              const count = categoryCounts[cat.id] || 0;
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedCategory(cat.id);
+                    setPosItemTypeFilter('PRODUCTS');
+                    setSelectedCatalogIndex(0);
+                  }}
+                  className={`px-3 py-1 rounded-full font-bold text-xs whitespace-nowrap transition-all cursor-pointer flex items-center gap-1 ${
+                    isCatActive
+                      ? 'bg-orange-600 text-white shadow-2xs'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  <span>{cat.name}</span>
+                  <span className="font-mono text-[11px] opacity-90">{count}</span>
+                </button>
+              );
+            })}
+
+            {/* Services Pill */}
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedCategory('SERVICES');
+                setPosItemTypeFilter('SERVICES');
+                setSelectedCatalogIndex(0);
+              }}
+              className={`px-3 py-1 rounded-full font-bold text-xs whitespace-nowrap transition-all cursor-pointer flex items-center gap-1 ${
+                selectedCategory === 'SERVICES' || posItemTypeFilter === 'SERVICES'
+                  ? 'bg-orange-600 text-white shadow-2xs'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+            >
+              <span>Services</span>
+              <span className="font-mono text-[11px] opacity-90">{categoryCounts.SERVICES}</span>
+            </button>
+          </div>
+
+          {/* 3. Subtitle / Keyboard Shortcuts Bar */}
+          <div className="flex items-center justify-between text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-1 pt-0.5 shrink-0">
+            <span>QUICK PICKS · BEST SELLERS</span>
+            <span className="hidden sm:inline font-mono">↑ ↓ TO MOVE · ENTER TO ADD · ESC TO CLEAR</span>
+          </div>
+
+          {/* 4. Vertical Item List (Smooth Internal Scroll) */}
+          {filteredCatalog.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center py-8 text-center text-slate-500 text-xs bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+              <Package size={28} className="mx-auto text-slate-300 mb-1.5 stroke-[1.5]" />
+              <div className="font-extrabold text-slate-700 text-xs">No items found</div>
+              <p className="text-[11px] text-slate-400 mt-0.5 max-w-xs mx-auto">
+                {productSearch
+                  ? 'No products or services match your search query.'
+                  : selectedCategory !== 'ALL'
+                  ? 'No items match the selected category in this view.'
+                  : 'No active items available.'}
+              </p>
+            </div>
+          ) : (
+            <div
+              ref={catalogListRef}
+              className="flex-1 overflow-y-auto pr-1 space-y-1.5 min-h-0 select-none"
+            >
+              {filteredCatalog.map((item, idx) => {
+                const isService = item.item_type === 'SERVICE';
+                const stock = isService ? 999 : parseFloat(item.current_stock || item.stock || 0);
+                const isSelected = selectedCatalogIndex === idx;
+
+                const inCartItem = cart.find((c) =>
+                  isService
+                    ? c.item_type === 'SERVICE' && c.service_id === item.id
+                    : c.item_type === 'PRODUCT' && c.product_id === item.id
+                );
+                const inCartQty = inCartItem ? inCartItem.quantity : 0;
+
+                return (
+                  <div
+                    key={`${item.item_type}-${item.id}`}
+                    ref={(el) => (catalogItemRefs.current[idx] = el)}
+                    onClick={() => {
+                      setSelectedCatalogIndex(idx);
+                      handleAddToCart(item);
+                    }}
+                    className={`p-2.5 rounded-xl flex items-center justify-between gap-2.5 transition-all cursor-pointer ${
+                      isSelected
+                        ? 'border-2 border-orange-500 bg-orange-50/25 shadow-2xs'
+                        : 'border border-slate-100 hover:border-slate-300 hover:bg-slate-50/70 bg-white'
+                    }`}
+                  >
+                    {/* Left: Item Title & Subtitle */}
+                    <div className="min-w-0 flex-1">
+                      <h4 className="font-bold text-slate-900 text-xs sm:text-sm leading-snug truncate">
+                        {item.display_title}
+                      </h4>
+                      <p className="text-[10.5px] text-slate-400 font-mono font-medium mt-0.5 flex items-center gap-1 truncate">
+                        <span>{item.display_code}</span>
+                        <span>·</span>
+                        <span>{item.category_name || (isService ? 'Services' : 'Hardware')}</span>
+                        {item.matching_serial && (
+                          <span className="text-amber-800 font-bold bg-amber-50 px-1 py-0.2 rounded text-[9.5px]">
+                            S/N: {item.matching_serial}
+                          </span>
+                        )}
+                        {inCartQty > 0 && (
+                          <span className="text-orange-700 font-bold bg-orange-100/80 px-1.5 py-0.2 rounded text-[9.5px]">
+                            ({inCartQty} in cart)
+                          </span>
+                        )}
+                      </p>
+                    </div>
+
+                    {/* Right: Badge, Price, Add Button */}
+                    <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                      {/* Stock / Service Badge */}
+                      {isService ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-50 text-purple-700 border border-purple-100/60">
+                          Service
+                        </span>
+                      ) : stock <= 0 ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-100/60">
+                          Out
+                        </span>
+                      ) : stock <= 3 ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-100/60">
+                          Only {stock}
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-teal-50 text-teal-700 border border-teal-100/60">
+                          {stock} in stock
+                        </span>
+                      )}
+
+                      {/* Price */}
+                      <span className="text-xs sm:text-sm font-bold font-mono text-slate-900 tracking-tight min-w-[75px] text-right">
+                        ₹{item.display_price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+
+                      {/* Tactile Orange Square Add Button */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedCatalogIndex(idx);
+                          handleAddToCart(item);
+                        }}
+                        className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-orange-600 hover:bg-orange-700 active:scale-95 text-white flex items-center justify-center shadow-xs transition-all shrink-0 cursor-pointer"
+                        title="Add to Bill (Enter)"
+                      >
+                        <Plus size={15} className="stroke-[3]" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
-        {/* RIGHT COLUMN: POS Cart, Financial Summary & Checkout (5 Cols on LG) */}
-        <div className="lg:col-span-5 space-y-4">
-          <div className="bg-white p-4.5 rounded-2xl border border-slate-200 shadow-2xs space-y-4">
-            {/* Cart Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center border border-orange-200">
-                  <ShoppingCart size={16} />
-                </div>
-                <div>
-                  <h3 className="font-extrabold text-sm text-slate-900">Current Cart Items</h3>
-                  <p className="text-[10.5px] text-slate-400">
-                    {cart.reduce((sum, item) => sum + (item.quantity || 1), 0)} total units
-                  </p>
-                </div>
+        {/* RIGHT COLUMN: POS Cart, Financial Summary & Checkout (5 Cols on LG) - High-Density Fixed-Height Viewport */}
+        <div className="lg:col-span-5 flex flex-col h-full min-h-0 bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs space-y-2 overflow-hidden">
+          {/* Cart Header */}
+          <div className="flex items-center justify-between pb-1.5 border-b border-slate-100 shrink-0">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center border border-orange-200">
+                <ShoppingCart size={14} />
               </div>
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-800 text-[11px] font-mono font-bold">
-                  {cart.length} {cart.length === 1 ? 'Item' : 'Items'}
-                </span>
-                {cart.length > 0 && (
-                  <button
-                    onClick={handleClearCart}
-                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                    title="Clear All Cart Items"
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Invoice Stream Toggle: GST Tax Invoice (INV-) vs Non-GST Bill / Estimate (EST-) */}
-            <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1 text-xs">
-              <button
-                type="button"
-                onClick={() => handleToggleInvoiceType(true)}
-                className={`flex-1 py-1.5 px-2 rounded-lg text-center transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                  isGstInvoice
-                    ? 'bg-white text-orange-600 shadow-2xs font-extrabold ring-1 ring-slate-200'
-                    : 'text-slate-600 hover:text-slate-900 font-semibold'
-                }`}
-              >
-                <FileText size={13} />
-                <span>GST Tax Invoice</span>
-                <span className="text-[9px] px-1.5 py-0.2 rounded font-mono font-extrabold bg-orange-100 text-orange-800">
-                  {businessProfile?.next_invoice_number ? `${businessProfile.invoice_prefix || 'INV-'}${businessProfile.next_invoice_number}` : 'INV-'}
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleToggleInvoiceType(false)}
-                className={`flex-1 py-1.5 px-2 rounded-lg text-center transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                  !isGstInvoice
-                    ? 'bg-white text-indigo-700 shadow-2xs font-extrabold ring-1 ring-slate-200'
-                    : 'text-slate-600 hover:text-slate-900 font-semibold'
-                }`}
-              >
-                <Tag size={13} />
-                <span>Non-GST Bill</span>
-                <span className="text-[9px] px-1.5 py-0.2 rounded font-mono font-extrabold bg-indigo-100 text-indigo-800">
-                  {businessProfile?.next_non_gst_number ? `${businessProfile.non_gst_prefix || 'EST-'}${businessProfile.next_non_gst_number}` : 'EST-'}
-                </span>
-              </button>
-            </div>
-
-            {/* Cart Items List */}
-            {cart.length === 0 ? (
-              <div className="py-14 text-center text-slate-400 text-xs bg-slate-50/60 rounded-2xl border border-dashed border-slate-200 space-y-2">
-                <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center mx-auto text-slate-300 shadow-2xs">
-                  <ShoppingCart size={24} className="stroke-[1.5]" />
-                </div>
-                <div className="font-bold text-slate-700 text-sm">Your POS Cart is Empty</div>
-                <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
-                  Click any product or service from the catalog on the left, or scan a barcode to add it to this bill.
+              <div>
+                <h3 className="font-extrabold text-xs text-slate-900 leading-tight">Current Cart Items</h3>
+                <p className="text-[10px] text-slate-400">
+                  {cart.reduce((sum, item) => sum + (item.quantity || 1), 0)} total units
                 </p>
               </div>
-            ) : (
-              <div className="space-y-2.5 max-h-[360px] overflow-y-auto p-1 pt-1.5 pb-1 pr-1.5">
-                {cart.map((item, idx) => {
-                  const lineTotal = item.quantity * item.selling_price * (1 - (item.discount_pct || 0) / 100);
-                  const isService = item.item_type === 'SERVICE';
-                  const isSerial = !isService && item.tracking_type === 'SERIAL_NUMBER';
-                  const availableSerials = availableSerialsCache[item.product_id] || [];
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded-full bg-orange-100 text-orange-800 text-[10.5px] font-mono font-bold">
+                {cart.length} {cart.length === 1 ? 'Item' : 'Items'}
+              </span>
+              {cart.length > 0 && (
+                <button
+                  onClick={handleClearCart}
+                  className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer text-xs flex items-center gap-1 font-semibold"
+                  title="Clear All Cart Items"
+                >
+                  <Trash2 size={13} />
+                  <span className="text-[10px]">Clear</span>
+                </button>
+              )}
+            </div>
+          </div>
 
-                  return (
+          {/* Invoice Stream Toggle: GST Tax Invoice (INV-) vs Non-GST Bill / Estimate (EST-) */}
+          <div className="bg-slate-100 p-0.5 rounded-lg flex items-center gap-1 text-[11px] shrink-0">
+            <button
+              type="button"
+              onClick={() => handleToggleInvoiceType(true)}
+              className={`flex-1 py-1 px-2 rounded-md text-center transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                isGstInvoice
+                  ? 'bg-white text-orange-600 shadow-2xs font-extrabold ring-1 ring-slate-200'
+                  : 'text-slate-600 hover:text-slate-900 font-semibold'
+              }`}
+            >
+              <FileText size={11} />
+              <span>GST Tax Invoice</span>
+              <span className="text-[9px] px-1 py-0.2 rounded font-mono font-extrabold bg-orange-100 text-orange-800">
+                {businessProfile?.next_invoice_number ? `${businessProfile.invoice_prefix || 'INV-'}${businessProfile.next_invoice_number}` : 'INV-'}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleToggleInvoiceType(false)}
+              className={`flex-1 py-1 px-2 rounded-md text-center transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                !isGstInvoice
+                  ? 'bg-white text-indigo-700 shadow-2xs font-extrabold ring-1 ring-slate-200'
+                  : 'text-slate-600 hover:text-slate-900 font-semibold'
+              }`}
+            >
+              <Tag size={11} />
+              <span>Non-GST Bill</span>
+              <span className="text-[9px] px-1 py-0.2 rounded font-mono font-extrabold bg-indigo-100 text-indigo-800">
+                {businessProfile?.next_non_gst_number ? `${businessProfile.non_gst_prefix || 'EST-'}${businessProfile.next_non_gst_number}` : 'EST-'}
+              </span>
+            </button>
+          </div>
+
+          {/* Cart Items List */}
+          {cart.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center py-6 text-center text-slate-400 text-xs bg-slate-50/60 rounded-xl border border-dashed border-slate-200 space-y-1.5 min-h-[140px]">
+              <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center mx-auto text-slate-300 shadow-2xs">
+                <ShoppingCart size={20} className="stroke-[1.5]" />
+              </div>
+              <div className="font-bold text-slate-700 text-xs">Your POS Cart is Empty</div>
+              <p className="text-[10.5px] text-slate-400 max-w-xs mx-auto">
+                Click any product or service from the catalog on the left to add it to this bill.
+              </p>
+            </div>
+          ) : (
+            <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 min-h-[120px]">
+              {cart.map((item, idx) => {
+                const lineTotal = item.quantity * item.selling_price * (1 - (item.discount_pct || 0) / 100);
+                const isService = item.item_type === 'SERVICE';
+                const isSerial = !isService && item.tracking_type === 'SERIAL_NUMBER';
+                const availableSerials = availableSerialsCache[item.product_id] || [];
+
+                return (
                     <div
                       key={idx}
                       className={`p-3 rounded-xl border transition-all ${
@@ -1455,6 +1614,42 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
                           <div className="text-[10px] text-slate-500 font-mono">
                             {item.sku} {!isService && `• Stock: ${item.current_stock}`} • {isGstInvoice ? `GST ${parseFloat(item.gst_rate !== undefined && item.gst_rate !== null ? item.gst_rate : 18)}%` : 'Non-GST (0% Tax)'}
                           </div>
+
+                          {/* Warranty Badge or Toggle */}
+                          <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                            {item.warranty ? (
+                              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs">
+                                <ShieldCheck size={11} className="text-blue-600 shrink-0" />
+                                <span>{item.warranty}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleWarranty(idx)}
+                                  className="ml-1 text-[9.5px] text-blue-600 hover:text-blue-900 underline font-semibold cursor-pointer"
+                                  title="Edit warranty"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleClearWarranty(idx)}
+                                  className="p-0.5 text-blue-400 hover:text-rose-600 rounded cursor-pointer"
+                                  title="Remove warranty"
+                                >
+                                  <X size={10} />
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleToggleWarranty(idx)}
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold text-slate-500 hover:text-blue-700 bg-white hover:bg-blue-50/60 border border-slate-200 hover:border-blue-300 transition-colors cursor-pointer"
+                                title="Add warranty for this item"
+                              >
+                                <Shield size={10} className="text-slate-400" />
+                                <span>+ Warranty</span>
+                              </button>
+                            )}
+                          </div>
                         </div>
                         <button
                           onClick={() => handleRemoveItem(idx)}
@@ -1464,6 +1659,89 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
                           <Trash2 size={14} />
                         </button>
                       </div>
+
+                      {/* Expandable Warranty Drawer (If Open) */}
+                      {item.is_warranty_open && (
+                        <div className="p-2.5 bg-blue-50/60 border border-blue-200 rounded-lg text-xs space-y-2 mt-2">
+                          <div className="font-extrabold text-blue-950 text-[10.5px] flex items-center justify-between">
+                            <span className="flex items-center gap-1.5">
+                              <Shield size={12} className="text-blue-600" />
+                              <span>Select or Type Warranty</span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleWarranty(idx)}
+                              className="text-slate-400 hover:text-slate-700 p-0.5 rounded cursor-pointer"
+                              title="Close warranty editor"
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+
+                          {/* Quick 1-Click Preset Chips */}
+                          <div className="flex flex-wrap items-center gap-1">
+                            {[
+                              '1 Year Brand',
+                              '2 Years Brand',
+                              '3 Years Brand',
+                              '6 Months Store',
+                              '1 Month Testing',
+                              '7 Days Replacement',
+                            ].map((preset) => {
+                              const presetFull = `${preset} Warranty`;
+                              const isSelected = (item.warranty || '') === presetFull;
+                              return (
+                                <button
+                                  key={preset}
+                                  type="button"
+                                  onClick={() => handleSelectWarrantyPreset(idx, presetFull)}
+                                  className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-all cursor-pointer ${
+                                    isSelected
+                                      ? 'bg-blue-600 text-white font-bold shadow-2xs'
+                                      : 'bg-white hover:bg-blue-100/70 text-slate-700 border border-blue-200'
+                                  }`}
+                                >
+                                  {preset}
+                                </button>
+                              );
+                            })}
+                            {item.warranty && (
+                              <button
+                                type="button"
+                                onClick={() => handleClearWarranty(idx)}
+                                className="px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 cursor-pointer"
+                              >
+                                Clear
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Custom Text Input + Done Button */}
+                          <div className="flex items-center gap-1.5 pt-0.5">
+                            <input
+                              type="text"
+                              value={item.warranty || ''}
+                              onChange={(e) => handleWarrantyChange(idx, e.target.value)}
+                              placeholder="Or type custom warranty (e.g. 1 Year On-site, 3 Yrs Manufacturer)..."
+                              className="flex-1 px-2.5 py-1 bg-white border border-blue-300 rounded-md text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleToggleWarranty(idx);
+                                }
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleToggleWarranty(idx)}
+                              className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-md shadow-2xs transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                            >
+                              <Check size={12} />
+                              <span>Done</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Serial Number Picker (If Serial Tracked) */}
                       {isSerial && (
@@ -1582,57 +1860,59 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
               </div>
             )}
 
+          {/* Pinned Bottom Controls: Summary, Payments, Checkout (Always Visible) */}
+          <div className="space-y-1.5 pt-1.5 border-t border-slate-100 shrink-0">
             {/* Financial Summary Card */}
-            <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2 text-xs font-mono">
-              <div className="flex justify-between text-slate-600">
+            <div className="p-2 bg-slate-50 rounded-xl border border-slate-200 space-y-1 text-xs font-mono">
+              <div className="flex justify-between text-slate-600 text-[11px]">
                 <span className="font-sans font-medium">{isGstInvoice ? 'Taxable Subtotal:' : 'Subtotal:'}</span>
                 <span>₹{summary.totalTaxable.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
               </div>
               {isGstInvoice ? (
-                <div className="flex justify-between text-slate-600">
-                  <span className="font-sans font-medium">Total GST ({summary.isInterstate ? 'IGST' : 'CGST + SGST'}):</span>
+                <div className="flex justify-between text-slate-600 text-[11px]">
+                  <span className="font-sans font-medium">Total GST ({summary.isInterstate ? 'IGST' : 'CGST+SGST'}):</span>
                   <span>₹{summary.totalTax.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                 </div>
               ) : (
-                <div className="flex justify-between text-indigo-700 font-semibold">
+                <div className="flex justify-between text-indigo-700 text-[11px] font-semibold">
                   <span className="font-sans font-medium">GST Amount:</span>
-                  <span className="px-1.5 py-0.2 rounded bg-indigo-50 border border-indigo-200 text-[10px] font-bold">₹0.00 (Non-GST / Estimate)</span>
+                  <span className="px-1 py-0.2 rounded bg-indigo-50 border border-indigo-200 text-[9.5px] font-bold">₹0.00 (Non-GST)</span>
                 </div>
               )}
               {summary.totalDiscount > 0 && (
-                <div className="flex justify-between text-emerald-700 font-bold">
-                  <span className="font-sans font-medium">Total Discount:</span>
+                <div className="flex justify-between text-emerald-700 font-bold text-[11px]">
+                  <span className="font-sans font-medium">Discount:</span>
                   <span>- ₹{summary.totalDiscount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                 </div>
               )}
-              <div className="flex justify-between items-baseline pt-2 border-t border-slate-200">
-                <span className="font-sans font-extrabold text-sm text-slate-900">Grand Total:</span>
-                <span className={`text-xl font-extrabold tracking-tight ${isGstInvoice ? 'text-orange-600' : 'text-indigo-700'}`}>
+              <div className="flex justify-between items-baseline pt-1 border-t border-slate-200">
+                <span className="font-sans font-extrabold text-xs text-slate-900">Grand Total:</span>
+                <span className={`text-base font-extrabold tracking-tight ${isGstInvoice ? 'text-orange-600' : 'text-indigo-700'}`}>
                   ₹{summary.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </span>
               </div>
             </div>
 
-            {/* Payment Mode Selector & Breakdown */}
-            <div className="space-y-3 pt-2 border-t border-slate-100">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-extrabold text-slate-900 uppercase tracking-wide">
+            {/* Quick Payment Mode Selector & Paid/Due Bar */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="font-extrabold text-slate-800 uppercase tracking-wide text-[10px]">
                   Payment Method
                 </span>
                 <button
                   type="button"
                   onClick={() => setShowSplitPayment(!showSplitPayment)}
-                  className="text-[11px] font-bold text-orange-600 hover:text-orange-700 cursor-pointer flex items-center gap-1"
+                  className="font-bold text-orange-600 hover:text-orange-700 cursor-pointer flex items-center gap-0.5 text-[10px]"
                 >
-                  <span>{showSplitPayment ? 'Hide Split Options' : '+ Split / Partner Payment'}</span>
+                  <span>{showSplitPayment ? 'Hide Split' : '+ Split / Partner'}</span>
                 </button>
               </div>
 
               {/* 4 Quick Payment Mode Cards */}
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-4 gap-1.5">
                 {[
                   { mode: 'CASH', label: 'Cash', icon: Banknote },
-                  { mode: 'UPI', label: 'UPI / QR', icon: QrCode },
+                  { mode: 'UPI', label: 'UPI', icon: QrCode },
                   { mode: 'CARD', label: 'Card', icon: CreditCard },
                   { mode: 'BANK_TRANSFER', label: 'Bank', icon: Building2 },
                 ].map(({ mode, label, icon: Icon }) => {
@@ -1642,23 +1922,23 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
                       key={mode}
                       type="button"
                       onClick={() => handleQuickPayFull(mode)}
-                      className={`p-2.5 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
+                      className={`py-1 px-1.5 rounded-lg border flex items-center justify-center gap-1 transition-all cursor-pointer ${
                         isSelected
-                          ? 'bg-orange-50 border-orange-500 text-orange-700 ring-2 ring-orange-500/20 shadow-2xs font-extrabold'
+                          ? 'bg-orange-50 border-orange-500 text-orange-700 ring-1 ring-orange-500/20 shadow-2xs font-extrabold'
                           : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700 font-bold'
                       }`}
                     >
-                      <Icon size={18} className={isSelected ? 'text-orange-600' : 'text-slate-500'} />
-                      <span className="text-[11px]">{label}</span>
+                      <Icon size={13} className={isSelected ? 'text-orange-600' : 'text-slate-500'} />
+                      <span className="text-[10.5px]">{label}</span>
                     </button>
                   );
                 })}
               </div>
 
               {/* Realtime Paid vs Due / Change Indicator */}
-              <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs font-mono">
+              <div className="flex items-center justify-between px-2 py-1 bg-slate-50 rounded-lg border border-slate-200 text-[11px] font-mono">
                 <span className="text-emerald-700 font-bold font-sans">
-                  Total Paid: ₹{summary.totalPaid.toFixed(2)}
+                  Paid: ₹{summary.totalPaid.toFixed(2)}
                 </span>
                 {summary.balanceDue > 0 ? (
                   <span className="text-rose-600 font-bold font-sans">
@@ -1666,7 +1946,7 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
                   </span>
                 ) : changeToReturn > 0 ? (
                   <span className="text-emerald-600 font-bold font-sans">
-                    Change to Return: ₹{changeToReturn.toFixed(2)}
+                    Change: ₹{changeToReturn.toFixed(2)}
                   </span>
                 ) : (
                   <span className="text-emerald-600 font-bold font-sans">
@@ -1677,22 +1957,22 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
 
               {/* Expandable Split Payment Rows */}
               {(showSplitPayment || payments.length > 1) && (
-                <div className="space-y-2 p-3 bg-slate-50/80 rounded-xl border border-slate-200">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                    Custom Split Payment Rows
+                <div className="space-y-1.5 p-2 bg-slate-50 rounded-lg border border-slate-200 max-h-28 overflow-y-auto">
+                  <div className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wider">
+                    Split Payment Rows
                   </div>
                   {payments.map((p, pidx) => (
-                    <div key={p.id} className="grid grid-cols-12 gap-1.5 items-center bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
+                    <div key={p.id} className="grid grid-cols-12 gap-1 items-center bg-white p-1 rounded border border-slate-200 shadow-2xs">
                       {/* Payer Select */}
                       <select
                         value={p.payer}
                         onChange={(e) => handlePaymentChange(pidx, 'payer', e.target.value)}
-                        className="col-span-4 px-2 py-1 bg-slate-50 border border-slate-200 rounded text-xs font-bold text-slate-900 focus:outline-none"
+                        className="col-span-4 px-1 py-0.5 bg-slate-50 border border-slate-200 rounded text-[10px] font-bold text-slate-900 focus:outline-none"
                       >
-                        <option value="BUSINESS">Business (Store)</option>
+                        <option value="BUSINESS">Store</option>
                         {partners.map((pt) => (
                           <option key={pt.id} value={pt.id}>
-                            Partner: {pt.name}
+                            {pt.name}
                           </option>
                         ))}
                       </select>
@@ -1701,7 +1981,7 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
                       <select
                         value={p.payment_mode}
                         onChange={(e) => handlePaymentChange(pidx, 'payment_mode', e.target.value)}
-                        className="col-span-3 px-2 py-1 bg-slate-50 border border-slate-200 rounded text-xs font-bold text-slate-900 focus:outline-none"
+                        className="col-span-3 px-1 py-0.5 bg-slate-50 border border-slate-200 rounded text-[10px] font-bold text-slate-900 focus:outline-none"
                       >
                         <option value="CASH">Cash</option>
                         <option value="UPI">UPI</option>
@@ -1716,7 +1996,7 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
                         placeholder="Amount"
                         value={p.amount}
                         onChange={(e) => handlePaymentChange(pidx, 'amount', e.target.value)}
-                        className="col-span-4 px-2 py-1 bg-slate-50 border border-slate-200 rounded text-xs font-mono font-bold text-slate-900 focus:outline-none"
+                        className="col-span-4 px-1 py-0.5 bg-slate-50 border border-slate-200 rounded text-[10px] font-mono font-bold text-slate-900 focus:outline-none"
                       />
 
                       {/* Remove Row Button */}
@@ -1725,7 +2005,7 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
                         onClick={() => handleRemovePaymentRow(pidx)}
                         className="col-span-1 text-slate-400 hover:text-rose-600 flex justify-center cursor-pointer"
                       >
-                        <Trash2 size={13} />
+                        <Trash2 size={11} />
                       </button>
                     </div>
                   ))}
@@ -1733,10 +2013,10 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
                   <button
                     type="button"
                     onClick={handleAddPaymentRow}
-                    className="text-xs font-bold text-orange-600 hover:text-orange-700 flex items-center gap-1 cursor-pointer pt-1"
+                    className="text-[10px] font-bold text-orange-600 hover:text-orange-700 flex items-center gap-0.5 cursor-pointer"
                   >
-                    <Plus size={13} />
-                    <span>+ Add Another Split Row</span>
+                    <Plus size={11} />
+                    <span>+ Add Split Row</span>
                   </button>
                 </div>
               )}
@@ -1744,9 +2024,26 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
 
             {/* Error Notification */}
             {formError && (
-              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs font-bold text-rose-800 flex items-center gap-2 animate-in fade-in">
-                <AlertCircle size={16} className="text-rose-600 flex-shrink-0" />
-                <span>{formError}</span>
+              <div className="p-2 bg-rose-50 border border-rose-200 rounded-lg text-xs font-bold text-rose-800 flex items-center gap-1.5 animate-in fade-in">
+                <AlertCircle size={14} className="text-rose-600 shrink-0" />
+                <span className="truncate">{formError}</span>
+              </div>
+            )}
+
+            {/* Customer Mandatory Notice above Checkout Button */}
+            {!selectedCustomer && (
+              <div className="p-2 bg-amber-50 border border-amber-300 rounded-lg text-xs text-amber-900 flex items-center justify-between gap-1.5 animate-in fade-in">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <AlertCircle size={14} className="text-amber-600 shrink-0" />
+                  <span className="font-bold text-[11px] truncate">Customer required to complete sale</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsCustomerLookupOpen(true)}
+                  className="px-2 py-0.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded text-[10.5px] shrink-0 cursor-pointer shadow-2xs"
+                >
+                  Select Customer *
+                </button>
               </div>
             )}
 
@@ -1755,20 +2052,20 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
               type="button"
               disabled={submitting || cart.length === 0}
               onClick={handleCompleteSale}
-              className={`w-full py-4 disabled:opacity-50 text-white font-extrabold text-sm rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all cursor-pointer uppercase tracking-wider ${
+              className={`w-full py-2.5 px-3 disabled:opacity-50 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer uppercase tracking-wider ${
                 isGstInvoice
                   ? 'bg-gradient-to-r from-orange-600 via-orange-500 to-amber-600 hover:from-orange-700 hover:to-amber-700 shadow-orange-500/25'
                   : 'bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-indigo-500/25'
               }`}
             >
               {submitting ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Processing {isGstInvoice ? 'Invoice' : 'Bill'}...</span>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Processing...</span>
                 </div>
               ) : (
                 <>
-                  <ShoppingCart size={18} />
+                  <ShoppingCart size={15} />
                   <span>
                     {isGstInvoice
                       ? `Complete GST Sale (${businessProfile?.next_invoice_number ? `${businessProfile.invoice_prefix || 'INV-'}${businessProfile.next_invoice_number}` : 'INV-'})`

@@ -296,8 +296,8 @@ class ProductViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['category', 'tracking_type', 'is_stock_enabled', 'is_active']
     search_fields = ['name', 'sku', 'barcode', 'brand', 'model_number', 'hsn_sac', 'specifications_text', 'category__name', 'serial_numbers__serial_number']
-    ordering_fields = ['name', 'selling_price', 'created_at']
-    ordering = ['name']
+    ordering_fields = ['name', 'selling_price', 'created_at', 'id']
+    ordering = ['-created_at', '-id']
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
@@ -406,8 +406,8 @@ class ServiceViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['category', 'is_active']
     search_fields = ['service_name', 'sac', 'description']
-    ordering_fields = ['service_name', 'default_rate', 'created_at']
-    ordering = ['service_name']
+    ordering_fields = ['service_name', 'default_rate', 'created_at', 'id']
+    ordering = ['-created_at', '-id']
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -685,6 +685,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             items_raw_data.append({
                 'item_type': item.item_type,
                 'description': item.description,
+                'warranty': item.warranty or '',
                 'hsn_sac': item.hsn_sac,
                 'qty': float(item.quantity),
                 'unit': item.unit,

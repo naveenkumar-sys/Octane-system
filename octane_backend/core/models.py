@@ -579,6 +579,7 @@ class InvoiceItem(models.Model):
     serial_number = models.ForeignKey(SerialNumber, on_delete=models.SET_NULL, null=True, blank=True)
 
     description = models.TextField()
+    warranty = models.CharField(max_length=150, blank=True, null=True, default='')
     hsn_sac = models.CharField(max_length=20, default="852411")
     quantity = models.DecimalField(max_digits=10, decimal_places=2, default=1.00)
     unit = models.CharField(max_length=20, default="NOS")

@@ -174,7 +174,7 @@ export const A4QuotationSheet = ({ quotation, company }) => {
             </div>
             <div className="flex items-center gap-1">
               <Phone size={10} className="text-[#0C4A8A] shrink-0" />
-              <span className="font-semibold">+91 95007 10234</span>
+              <span className="font-semibold whitespace-nowrap">+91 95007 10234</span>
             </div>
             <div className="flex items-center gap-1">
               <Globe size={10} className="text-[#0C4A8A] shrink-0" />
@@ -291,12 +291,12 @@ export const A4QuotationSheet = ({ quotation, company }) => {
           <table className="w-full border-collapse text-left">
             <thead>
               <tr className="bg-[#0C4A8A] text-white text-[10px] font-bold uppercase tracking-wider">
-                <th className="py-2 px-2 text-center w-[38px] border-r border-[#1B5BA1]">
+                <th className="py-2 px-2 text-center w-[36px] border-r border-[#1B5BA1]">
                   <div className="flex items-center justify-center gap-1">
                     <ListOrdered size={11} /> SN#
                   </div>
                 </th>
-                <th className="py-2 px-2 text-left w-[115px] border-r border-[#1B5BA1]">
+                <th className="py-2 px-2 text-left w-[95px] border-r border-[#1B5BA1]">
                   <div className="flex items-center gap-1">
                     <Settings size={11} /> Part Number
                   </div>
@@ -309,20 +309,20 @@ export const A4QuotationSheet = ({ quotation, company }) => {
                 <th className="py-2 px-2 text-right w-[85px] border-r border-[#1B5BA1]">
                   <div className="flex items-center justify-end gap-0.5">₹ Unit Price</div>
                 </th>
-                <th className="py-2 px-2 text-center w-[45px] border-r border-[#1B5BA1]">
+                <th className="py-2 px-2 text-center w-[42px] border-r border-[#1B5BA1]">
                   <div className="flex items-center justify-center gap-1">
                     <Package size={11} /> Qty
                   </div>
                 </th>
-                <th className="py-2 px-2 text-right w-[85px] border-r border-[#1B5BA1]">
+                <th className="py-2 px-2 text-right w-[88px] border-r border-[#1B5BA1]">
                   <div className="flex items-center justify-end gap-0.5">₹ Total value</div>
                 </th>
-                <th className="py-2 px-2 text-right w-[75px] border-r border-[#1B5BA1]">
+                <th className="py-2 px-2 text-right w-[85px] border-r border-[#1B5BA1]">
                   <div className="flex items-center justify-end gap-1">
                     <Percent size={10} /> GST %
                   </div>
                 </th>
-                <th className="py-2 px-2 text-right w-[95px]">
+                <th className="py-2 px-2 text-right w-[110px]">
                   <div className="flex items-center justify-end gap-0.5">₹ Total</div>
                 </th>
               </tr>
@@ -365,7 +365,7 @@ export const A4QuotationSheet = ({ quotation, company }) => {
                     <td className="py-1.5 px-1 text-center font-bold text-slate-700 border-r border-[#B8D7F2]">
                       {row.sn}
                     </td>
-                    <td className="py-1.5 px-2 font-mono font-bold text-slate-900 border-r border-[#B8D7F2] truncate max-w-[115px]">
+                    <td className="py-1.5 px-2 font-mono font-bold text-slate-900 border-r border-[#B8D7F2] truncate max-w-[95px]">
                       {row.part_number || row.sku || '—'}
                     </td>
                     <td className="py-1.5 px-3 font-semibold text-slate-900 border-r border-[#B8D7F2] leading-snug">
@@ -374,19 +374,19 @@ export const A4QuotationSheet = ({ quotation, company }) => {
                         <div className="text-[8.5px] text-slate-500 font-normal">{row.specifications}</div>
                       )}
                     </td>
-                    <td className="py-1.5 px-2 text-right font-mono font-semibold border-r border-[#B8D7F2]">
+                    <td className="py-1.5 px-2 text-right font-mono font-semibold border-r border-[#B8D7F2] whitespace-nowrap">
                       {formatINR(unitPrice)}
                     </td>
                     <td className="py-1.5 px-1 text-center font-bold border-r border-[#B8D7F2]">
                       {qty}
                     </td>
-                    <td className="py-1.5 px-2 text-right font-mono font-semibold border-r border-[#B8D7F2]">
+                    <td className="py-1.5 px-2 text-right font-mono font-semibold border-r border-[#B8D7F2] whitespace-nowrap">
                       {formatINR(taxableVal)}
                     </td>
-                    <td className="py-1.5 px-2 text-right font-mono text-slate-700 border-r border-[#B8D7F2]">
+                    <td className="py-1.5 px-2 text-right font-mono text-slate-700 border-r border-[#B8D7F2] whitespace-nowrap">
                       {gstRate}%
                     </td>
-                    <td className="py-1.5 px-2 text-right font-mono font-black text-[#0C4A8A]">
+                    <td className="py-1.5 px-2 text-right font-mono font-black text-[#0C4A8A] whitespace-nowrap">
                       {formatINR(total)}
                     </td>
                   </tr>
@@ -396,16 +396,16 @@ export const A4QuotationSheet = ({ quotation, company }) => {
             {/* Table Footer Totals */}
             <tfoot>
               <tr className="bg-[#EDF5FC] font-bold text-slate-900 border-t-2 border-[#0C4A8A] text-[10.5px]">
-                <td colSpan={3} className="py-1.5 px-3 text-right uppercase text-slate-800 tracking-wider">
+                <td colSpan={3} className="py-2 px-3 text-right uppercase text-slate-800 tracking-wider">
                   TOTAL TAXABLE / GRAND TOTAL:
                 </td>
-                <td colSpan={3} className="py-1.5 px-2 text-right font-mono font-bold text-slate-900 border-r border-[#B8D7F2]">
+                <td colSpan={3} className="py-2 px-2 text-right font-mono font-bold text-slate-900 border-r border-[#B8D7F2] whitespace-nowrap">
                   ₹ {formatINR(quotation?.taxable_amount || 0)}
                 </td>
-                <td className="py-1.5 px-2 text-right font-mono font-semibold text-slate-700 border-r border-[#B8D7F2] text-[10px]">
+                <td className="py-2 px-2 text-right font-mono font-semibold text-slate-700 border-r border-[#B8D7F2] text-[10px] whitespace-nowrap">
                   + ₹ {formatINR(quotation?.total_tax || 0)}
                 </td>
-                <td className="py-1.5 px-2 text-right font-mono text-[12px] font-black text-[#0C4A8A]">
+                <td className="py-2 px-2 text-right font-mono text-[11.5px] font-black text-[#0C4A8A] whitespace-nowrap">
                   ₹ {formatINR(quotation?.grand_total || 0)}
                 </td>
               </tr>
@@ -417,7 +417,23 @@ export const A4QuotationSheet = ({ quotation, company }) => {
           4. BOTTOM SECTION: Terms | Bank Details | Signatory
           (Flows dynamically based on table size)
       ======================================================== */}
-      <div className="mt-5">
+      <div className="mt-4">
+        {/* Optional Quotation Note (Prints directly above Terms & Conditions) */}
+        {quotation?.notes && String(quotation.notes).trim() && (
+          <div className="mb-2.5 bg-[#F4F9FD] border border-[#C5DFF5] rounded-xl p-2.5 text-[9.5px]">
+            <div
+              className="inline-flex items-center gap-1.5 text-white bg-[#0C4A8A] px-3.5 py-1 rounded-l-md font-bold uppercase text-[9.5px] mb-1.5"
+              style={{ clipPath: 'polygon(0 0, 92% 0, 100% 100%, 0 100%)' }}
+            >
+              <FileText size={11} className="text-[#00A3E0]" />
+              <span className="pr-2">Note:</span>
+            </div>
+            <div className="text-slate-800 font-semibold whitespace-pre-line leading-relaxed pl-1 text-[9.5px]">
+              {String(quotation.notes).trim()}
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-12 gap-3 pb-2 border-b border-slate-200 items-start">
           
           {/* Column 1: Terms & Conditions */}
@@ -502,7 +518,7 @@ export const A4QuotationSheet = ({ quotation, company }) => {
               <Mail size={10} />
             </div>
             <span>If you have any questions about this price quote, please contact:</span>
-            <span className="font-bold text-[#0C4A8A]">{contactPerson}, {contactPhone}</span>
+            <span className="font-bold text-[#0C4A8A] whitespace-nowrap">{contactPerson}, {contactPhone}</span>
             <span>E-mail: <strong className="text-[#0C4A8A]">{contactEmail}</strong></span>
           </div>
 
@@ -518,23 +534,27 @@ export const A4QuotationSheet = ({ quotation, company }) => {
             6. BOTTOM BRAND BAR WITH CYAN GEOMETRIC ACCENT
         ======================================================== */}
         <div className="relative bg-[#0C4A8A] text-white px-4 py-1.5 rounded-sm flex items-center justify-between text-[9px] font-medium overflow-hidden">
-          <div className="flex items-center gap-1.5">
-            <MapPin size={10} className="text-[#00A3E0]" />
-            <strong className="font-bold">OCTANE SYSTEMS</strong> &nbsp;|&nbsp; {companyAddress}
-          </div>
-          <div className="flex items-center gap-3 pr-10">
-            <span className="flex items-center gap-1">
-              <Phone size={10} className="text-[#00A3E0]" /> +91 95007 10234
+          <div className="flex items-center gap-1.5 min-w-0 pr-3 truncate">
+            <MapPin size={10} className="text-[#00A3E0] shrink-0" />
+            <span className="truncate">
+              <strong className="font-bold">OCTANE SYSTEMS</strong> &nbsp;|&nbsp; {companyAddress}
             </span>
-            <span>|</span>
-            <span className="flex items-center gap-1">
-              <Globe size={10} className="text-[#00A3E0]" /> www.octanesystems.in
+          </div>
+          <div className="flex items-center gap-2.5 pr-8 shrink-0 whitespace-nowrap">
+            <span className="flex items-center gap-1 whitespace-nowrap">
+              <Phone size={10} className="text-[#00A3E0] shrink-0" />
+              <span className="whitespace-nowrap font-semibold">{quotation?.contact_phone || '+91 95007 10234'}</span>
+            </span>
+            <span className="text-white/60">|</span>
+            <span className="flex items-center gap-1 whitespace-nowrap">
+              <Globe size={10} className="text-[#00A3E0] shrink-0" />
+              <span className="whitespace-nowrap">www.octanesystems.in</span>
             </span>
           </div>
 
           {/* Dynamic Geometric Cyan Accent Wing */}
           <div
-            className="absolute right-0 top-0 bottom-0 w-10 bg-[#00A3E0]"
+            className="absolute right-0 top-0 bottom-0 w-8 bg-[#00A3E0]"
             style={{ clipPath: 'polygon(45% 100%, 100% 0, 100% 100%, 0 100%)' }}
           />
         </div>

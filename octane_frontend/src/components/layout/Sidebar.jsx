@@ -62,6 +62,17 @@ export const NAVIGATION_ITEMS = [
     ],
   },
   {
+    id: 'pos',
+    section: 'POS Billing',
+    icon: ShoppingCart,
+    items: [
+      { id: '/pos/new', label: 'New Sale', path: '/pos/new', icon: ShoppingCart, badge: 'FAST', badgeColor: 'orange' },
+      { id: '/pos/invoices', label: 'Invoice History', path: '/pos/invoices', icon: FileText },
+      { id: '/pos/quotations/new', label: 'Quotation Prep', path: '/pos/quotations/new', icon: FileSpreadsheet, badge: 'NEW', badgeColor: 'blue' },
+      { id: '/pos/quotations', label: 'Quotations', path: '/pos/quotations', icon: Receipt },
+    ],
+  },
+  {
     id: 'purchases',
     section: 'Purchases',
     icon: ShoppingBag,
@@ -81,17 +92,6 @@ export const NAVIGATION_ITEMS = [
       { id: '/inventory/serial-numbers', label: 'Serial Numbers', path: '/inventory/serial-numbers', icon: Barcode },
       { id: '/inventory/opening-balance', label: 'Opening Balance', path: '/inventory/opening-balance', icon: Scale },
       { id: '/inventory/adjustment', label: 'Stock Adjustment', path: '/inventory/adjustment', icon: SlidersHorizontal },
-    ],
-  },
-  {
-    id: 'pos',
-    section: 'POS Billing',
-    icon: ShoppingCart,
-    items: [
-      { id: '/pos/new', label: 'New Sale', path: '/pos/new', icon: ShoppingCart, badge: 'FAST', badgeColor: 'orange' },
-      { id: '/pos/invoices', label: 'Invoice History', path: '/pos/invoices', icon: FileText },
-      { id: '/pos/quotations/new', label: 'Quotation Prep', path: '/pos/quotations/new', icon: FileSpreadsheet, badge: 'NEW', badgeColor: 'blue' },
-      { id: '/pos/quotations', label: 'Quotations', path: '/pos/quotations', icon: Receipt },
     ],
   },
   {
