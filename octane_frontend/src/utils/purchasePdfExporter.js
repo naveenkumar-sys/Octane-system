@@ -3,6 +3,7 @@ import autoTable from 'jspdf-autotable';
 import octaneLogo from '../assets/octane_logo.png';
 import octaneSeal from '../assets/octane_seal.png';
 import { numberToWordsRupees, formatDateDMY, renderItemSpecsAndSku } from '../components/invoice/A4InvoicePrint';
+import { exportDomToPdf } from './domPdfExporter';
 
 // Format numbers to Indian currency string
 const formatNum = (val) => {
@@ -36,6 +37,21 @@ export const downloadPurchasePdf = async (purchase, companyProfile = {}) => {
     throw new Error('No purchase data provided for PDF generation.');
   }
 
+  // Attempt pixel-perfect HTML/DOM export first so saved PDF matches print view 100%
+  if (typeof document !== 'undefined') {
+    try {
+      const fileName = await exportDomToPdf({
+        invoice: purchase,
+        company: companyProfile,
+        isPurchase: true,
+        copyType: 'SUPPLIER COPY',
+      });
+      return fileName;
+    } catch (domErr) {
+      console.warn('DOM PDF export failed, falling back to coordinate jsPDF:', domErr);
+    }
+  }
+
   const [logoImg, sealImg] = await Promise.all([
     loadHtmlImage(octaneLogo),
     loadHtmlImage(octaneSeal),
@@ -61,7 +77,7 @@ export const downloadPurchasePdf = async (purchase, companyProfile = {}) => {
   );
 
   const docTitle = purchase.title || (
-    isCancelled ? 'PURCHASE VOUCHER (CANCELLED / VOID)' : 'PURCHASE VOUCHER / STOCK RECEIPT'
+    isCancelled ? 'PURCHASE INVOICE (CANCELLED / VOID)' : 'PURCHASE INVOICE'
   );
 
   const copyType = 'SUPPLIER COPY';
@@ -201,17 +217,19 @@ export const downloadPurchasePdf = async (purchase, companyProfile = {}) => {
   let storeTextX = margin + 2;
   if (logoImg) {
     try {
-      doc.addImage(logoImg, 'PNG', margin + 2, sellerBuyerDividerY + 4.5, 7, 7);
-      storeTextX = margin + 10;
+      // 6.0mm x 6.0mm logo perfectly vertically centered with OCTANE SYSTEM text
+      doc.addImage(logoImg, 'PNG', margin + 2, sellerBuyerDividerY + 4.2, 5.8, 5.8);
+      storeTextX = margin + 9.5;
     } catch {
       // Ignore logo error
     }
   }
 
-  doc.setFontSize(9);
-  doc.text(String(company.name || 'OCTANE SYSTEM').toUpperCase(), storeTextX, sellerBuyerDividerY + 8.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.text(String(company.name || 'OCTANE SYSTEM').toUpperCase(), storeTextX, sellerBuyerDividerY + 8.2);
 
-  storeY = sellerBuyerDividerY + 13;
+  storeY = sellerBuyerDividerY + 12;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.text(company.address_line1 || '', margin + 2, storeY);
@@ -275,10 +293,16 @@ export const downloadPurchasePdf = async (purchase, companyProfile = {}) => {
 
   // Row 4: Notes / Remarks
   rY += rowH;
+  doc.setFont('helvetica', 'bold');
   doc.setFontSize(6.5);
-  doc.text('Notes / Remarks', midX + 2, rY + 4);
-  doc.setFontSize(7.5);
-  doc.text(purchase.notes || 'Vendor Stock Entry', midX + 2, rY + 9);
+  doc.text('Notes / Remarks', midX + 2, rY + 3.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  const rawNotes = purchase.notes || 'Vendor Stock Entry';
+  const cleanNotes = String(rawNotes).replace(/₹/g, 'Rs. ');
+  const maxNotesWidth = 78; // Constrain to 78mm to stay well clear of the right border at 98mm
+  const splitNotes = doc.splitTextToSize(cleanNotes, maxNotesWidth);
+  doc.text(splitNotes.slice(0, 3), midX + 2, rY + 7);
 
   // 4. Item Table Section
   const tableStartY = startY + gridH;
@@ -630,7 +654,7 @@ export const downloadPurchasePdf = async (purchase, companyProfile = {}) => {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.8);
   doc.text(
-    'We declare that this purchase voucher shows the actual price of the goods\nreceived and that all particulars are verified and recorded.',
+    'We declare that this purchase invoice shows the actual price of the goods\nreceived and that all particulars are verified and recorded.',
     margin + 2,
     currentY + 8
   );

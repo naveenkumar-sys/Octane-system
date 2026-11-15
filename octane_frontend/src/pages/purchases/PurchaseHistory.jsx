@@ -477,7 +477,7 @@ export const PurchaseHistory = ({ onSelectRoute }) => {
                   onClick={() => handleDownloadPdf(detailPurchase)}
                   disabled={downloadingId === detailPurchase?.id}
                   className="flex items-center gap-2 px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl shadow-xs border border-slate-700 cursor-pointer transition-all disabled:opacity-50"
-                  title="Save purchase voucher as PDF"
+                  title="Save purchase invoice as PDF"
                 >
                   <Download size={14} className={downloadingId === detailPurchase?.id ? 'animate-bounce text-orange-400' : 'text-orange-400'} />
                   <span>{downloadingId === detailPurchase?.id ? 'Saving PDF...' : 'Save as PDF'}</span>
@@ -512,7 +512,7 @@ export const PurchaseHistory = ({ onSelectRoute }) => {
                 <AlertCircle size={18} className="text-rose-600 shrink-0 mt-0.5" />
                 <div>
                   <div className="font-extrabold text-xs text-rose-900 uppercase tracking-wide">
-                    Purchase Voucher Cancelled & Voided
+                    Purchase Invoice Cancelled & Voided
                   </div>
                   <div className="text-[11px] text-rose-700 mt-0.5 leading-relaxed">
                     {detailPurchase.notes}

@@ -325,16 +325,30 @@ export const NewPurchase = ({ onNavigate }) => {
   };
 
   const handleQuantityChange = (index, newQty) => {
-    const qtyInt = Math.max(1, parseInt(newQty || '1', 10));
     const newItems = [...items];
+    
+    // Allow empty string so user can freely erase and type new quantity
+    if (newQty === '' || newQty === null || newQty === undefined) {
+      newItems[index] = {
+        ...newItems[index],
+        quantity: '',
+      };
+      setItems(newItems);
+      return;
+    }
+
+    const parsed = parseInt(newQty, 10);
+    const qtyInt = isNaN(parsed) ? '' : Math.max(1, parsed);
     const currSerials = newItems[index].serials || [];
     
     // Adjust serials array length to match exact quantity
     let adjustedSerials = [...currSerials];
-    if (adjustedSerials.length < qtyInt) {
-      while (adjustedSerials.length < qtyInt) adjustedSerials.push('');
-    } else if (adjustedSerials.length > qtyInt) {
-      adjustedSerials = adjustedSerials.slice(0, qtyInt);
+    if (typeof qtyInt === 'number') {
+      if (adjustedSerials.length < qtyInt) {
+        while (adjustedSerials.length < qtyInt) adjustedSerials.push('');
+      } else if (adjustedSerials.length > qtyInt) {
+        adjustedSerials = adjustedSerials.slice(0, qtyInt);
+      }
     }
 
     newItems[index] = {
@@ -439,16 +453,23 @@ export const NewPurchase = ({ onNavigate }) => {
     // Serial numbers validation
     for (let idx = 0; idx < items.length; idx++) {
       const item = items[idx];
+      const itemQty = parseInt(item.quantity, 10) || 0;
+      if (itemQty < 1) {
+        const err = `Please enter a valid quantity of at least 1 for line item #${idx + 1}.`;
+        setFormError(err);
+        toast.error(err);
+        return;
+      }
       if (item.tracking_type === 'SERIAL_NUMBER') {
         const serials = item.serials || [];
-        if (serials.length !== item.quantity) {
-          const err = `Product "${item.product_name}" requires exactly ${item.quantity} serial numbers.`;
+        if (serials.length !== itemQty) {
+          const err = `Product "${item.product_name}" requires exactly ${itemQty} serial numbers.`;
           setFormError(err);
           toast.error(err);
           return;
         }
         if (serials.some((s) => !s.trim())) {
-          const err = `Please enter all ${item.quantity} serial numbers for product "${item.product_name}".`;
+          const err = `Please enter all ${itemQty} serial numbers for product "${item.product_name}".`;
           setFormError(err);
           toast.error(err);
           return;
@@ -511,7 +532,7 @@ export const NewPurchase = ({ onNavigate }) => {
             ? 'Business'
             : (partners.find((pt) => String(pt.id) === String(p.payer))?.name || `Partner #${p.payer}`);
           const refStr = p.reference_number ? ` (Ref: ${p.reference_number})` : '';
-          return `Payment #${idx + 1}: ${payerName} | ${p.payment_mode} | ₹${parseFloat(p.amount || 0).toLocaleString('en-IN')}${refStr}`;
+          return `Payment #${idx + 1}: ${payerName} | ${p.payment_mode} | Rs. ${parseFloat(p.amount || 0).toLocaleString('en-IN')}${refStr}`;
         })
         .join(' ; ');
 
@@ -627,10 +648,10 @@ export const NewPurchase = ({ onNavigate }) => {
                   type="button"
                   onClick={() => setPrintInvoiceData(createdPurchaseData)}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 text-xs font-bold rounded-xl shadow-xs cursor-pointer transition-all"
-                  title="Print purchase voucher"
+                  title="Print purchase invoice"
                 >
                   <Printer size={14} className="text-orange-600" />
-                  <span>Print Voucher</span>
+                  <span>Print Purchase Invoice</span>
                 </button>
               </>
             )}
@@ -934,8 +955,15 @@ export const NewPurchase = ({ onNavigate }) => {
                         type="number"
                         min="1"
                         required
+                        placeholder="1"
                         value={item.quantity}
                         onChange={(e) => handleQuantityChange(idx, e.target.value)}
+                        onBlur={() => {
+                          if (item.quantity === '' || parseInt(item.quantity, 10) < 1) {
+                            handleQuantityChange(idx, '1');
+                          }
+                        }}
+                        onFocus={(e) => e.target.select()}
                         className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500/30"
                       />
                     </div>
@@ -994,14 +1022,14 @@ export const NewPurchase = ({ onNavigate }) => {
                     <div className="mt-3 p-3 bg-amber-50/80 border border-amber-200 rounded-xl space-y-2">
                       <div className="flex items-center gap-2 text-xs font-bold text-amber-900">
                         <Info size={15} className="text-amber-600" />
-                        <span>Serial Number Tracking Required ({item.quantity} Units)</span>
+                        <span>Serial Number Tracking Required ({parseInt(item.quantity, 10) || 0} Units)</span>
                       </div>
                       <p className="text-[11px] text-amber-800">
-                        Enter physical device serial numbers below. Exactly {item.quantity} unique serial number(s) required.
+                        Enter physical device serial numbers below. Exactly {parseInt(item.quantity, 10) || 0} unique serial number(s) required.
                       </p>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 pt-1">
-                        {Array.from({ length: item.quantity }).map((_, sIdx) => (
+                        {Array.from({ length: parseInt(item.quantity, 10) || 0 }).map((_, sIdx) => (
                           <div key={sIdx} className="space-y-0.5">
                             <label className="text-[10px] font-bold text-amber-900">
                               Serial #{sIdx + 1} *

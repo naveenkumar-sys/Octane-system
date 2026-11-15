@@ -143,7 +143,7 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
     setError(null);
     try {
       const [prodRes, catRes, custRes, partRes, servRes, serialsRes, profRes, servCatRes] = await Promise.all([
-        api.getProducts(),
+        api.getProducts('?is_active=true').catch(() => api.getProducts()),
         api.getProductCategories(),
         api.getCustomers(),
         api.getPartners(),
@@ -161,7 +161,8 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
       const serialList = Array.isArray(serialsRes) ? serialsRes : serialsRes?.results || [];
       const servCatList = Array.isArray(servCatRes) ? servCatRes : servCatRes?.results || [];
 
-      setProducts(prodList);
+      // Only active products and services are eligible for POS terminal sales
+      setProducts(prodList.filter((p) => p.is_active !== false));
       setCategories(catList);
       setServiceCategories(servCatList);
       setCustomers(custList);
@@ -265,14 +266,16 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
     }
   };
 
-  // Dynamic Category Counts for Category Filter Pills
+  // Dynamic Category Counts for Category Filter Pills (Active items only)
   const categoryCounts = useMemo(() => {
+    const activeProducts = products.filter((p) => p.is_active !== false);
+    const activeServices = services.filter((s) => s.is_active !== false);
     const counts = {
-      ALL: products.length + services.length,
-      SERVICES: services.length,
+      ALL: activeProducts.length + activeServices.length,
+      SERVICES: activeServices.length,
     };
     categories.forEach((cat) => {
-      counts[cat.id] = products.filter((p) => String(p.category) === String(cat.id)).length;
+      counts[cat.id] = activeProducts.filter((p) => String(p.category) === String(cat.id)).length;
     });
     return counts;
   }, [products, services, categories]);
@@ -292,9 +295,10 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
     const isAll = selectedCategory === 'ALL' && posItemTypeFilter === 'ALL';
     const isServiceCategory = selectedCategory === 'SERVICES' || posItemTypeFilter === 'SERVICES';
 
-    // Add Products (if not strictly SERVICES view)
+    // Add Products (if not strictly SERVICES view) - Exclude deactivated products
     if (!isServiceCategory && (posItemTypeFilter === 'ALL' || posItemTypeFilter === 'PRODUCTS')) {
       products.forEach((p) => {
+        if (p.is_active === false) return;
         if (!isAll && selectedCategory !== 'ALL' && String(p.category) !== String(selectedCategory)) {
           return;
         }
@@ -580,11 +584,12 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
 
     const code = barcodeInput.trim().toLowerCase();
 
-    // 1. First check if code matches product barcode or SKU
+    // 1. First check if code matches active product barcode or SKU
     let matched = products.find(
       (p) =>
-        (p.barcode || '').toLowerCase() === code ||
-        (p.sku || '').toLowerCase() === code
+        p.is_active !== false &&
+        ((p.barcode || '').toLowerCase() === code ||
+        (p.sku || '').toLowerCase() === code)
     );
     let matchedSerial = null;
 
@@ -592,7 +597,7 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
     if (!matched) {
       const serialObj = availableSerialsList.find((sn) => (sn.serial_number || '').toLowerCase() === code);
       if (serialObj) {
-        matched = products.find((p) => String(p.id) === String(serialObj.product));
+        matched = products.find((p) => p.is_active !== false && String(p.id) === String(serialObj.product));
         matchedSerial = serialObj.serial_number;
       }
     }
@@ -643,11 +648,20 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
 
   // Direct Quantity Input
   const handleQuantitySet = (index, val) => {
-    const qty = parseInt(val, 10);
-    if (isNaN(qty) || qty <= 0) return;
-
     const updated = [...cart];
     const item = updated[index];
+
+    if (val === '' || val === null || val === undefined) {
+      updated[index] = {
+        ...item,
+        quantity: '',
+      };
+      setCart(updated);
+      return;
+    }
+
+    const qty = parseInt(val, 10);
+    if (isNaN(qty) || qty <= 0) return;
 
     if (item.item_type !== 'SERVICE' && qty > item.current_stock) {
       toast.warning(`Maximum available stock for "${item.product_name}" is ${item.current_stock}.`);
@@ -1139,7 +1153,7 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
   if (error) return <ErrorState message={error} onRetry={fetchInitialPOSData} />;
 
   return (
-    <div className="flex flex-col h-full space-y-2 overflow-hidden">
+    <div className="flex flex-col space-y-2.5">
       {/* 1. Terminal Top Bar (Compact High-Efficiency POS Header) */}
       <div className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white shadow-2xs flex flex-wrap items-center justify-between gap-2.5 shrink-0">
         {/* Terminal Title & Active Status */}
@@ -1284,11 +1298,11 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
         </div>
       )}
 
-      {/* 2. Main Terminal Layout Grid (Catalog Left 60% • Cart Right 40% - Single Screen Viewport) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-2.5 flex-1 min-h-0 overflow-hidden">
+      {/* 2. Main Terminal Layout Grid (Catalog Left 60% • Cart Right 40%) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
 
         {/* LEFT COLUMN: Product & Service Catalog (7 Cols on LG) - High-Density POS Kiosk Layout */}
-        <div className="lg:col-span-7 flex flex-col h-full min-h-0 bg-white p-3 rounded-2xl border border-slate-200/90 shadow-2xs space-y-2 overflow-hidden">
+        <div className="lg:col-span-7 flex flex-col bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-2.5 max-h-[calc(100vh-7.5rem)] min-h-[500px]">
           {/* 1. Top Search Bar */}
           <div className="relative flex items-center w-full rounded-xl border-2 border-orange-500 bg-white px-3 py-1.5 sm:py-2 shadow-xs transition-all focus-within:ring-2 focus-within:ring-orange-500/10 shrink-0">
             <Search size={17} className="text-[#6C5CE7] stroke-[2.5] shrink-0" />
@@ -1504,8 +1518,8 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
           )}
         </div>
 
-        {/* RIGHT COLUMN: POS Cart, Financial Summary & Checkout (5 Cols on LG) - High-Density Fixed-Height Viewport */}
-        <div className="lg:col-span-5 flex flex-col h-full min-h-0 bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs space-y-2 overflow-hidden">
+        {/* RIGHT COLUMN: POS Cart, Financial Summary & Checkout (5 Cols on LG) - Dynamic Height that grows with added products */}
+        <div className="lg:col-span-5 flex flex-col h-fit bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs space-y-2.5 transition-all">
           {/* Cart Header */}
           <div className="flex items-center justify-between pb-1.5 border-b border-slate-100 shrink-0">
             <div className="flex items-center gap-2">
@@ -1570,19 +1584,19 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
             </button>
           </div>
 
-          {/* Cart Items List */}
+          {/* Cart Items List - Dynamically adjusts height based on added products */}
           {cart.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center py-6 text-center text-slate-400 text-xs bg-slate-50/60 rounded-xl border border-dashed border-slate-200 space-y-1.5 min-h-[140px]">
-              <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center mx-auto text-slate-300 shadow-2xs">
-                <ShoppingCart size={20} className="stroke-[1.5]" />
+            <div className="flex flex-col items-center justify-center py-4 text-center text-slate-400 text-xs bg-slate-50/60 rounded-xl border border-dashed border-slate-200 space-y-1">
+              <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center mx-auto text-slate-300 shadow-2xs">
+                <ShoppingCart size={16} className="stroke-[1.5]" />
               </div>
               <div className="font-bold text-slate-700 text-xs">Your POS Cart is Empty</div>
-              <p className="text-[10.5px] text-slate-400 max-w-xs mx-auto">
-                Click any product or service from the catalog on the left to add it to this bill.
+              <p className="text-[10px] text-slate-400 max-w-xs mx-auto">
+                Click any product or service from the catalog to add it to this bill.
               </p>
             </div>
           ) : (
-            <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 min-h-[120px]">
+            <div className="space-y-1.5 max-h-[380px] overflow-y-auto pr-1 transition-all">
               {cart.map((item, idx) => {
                 const lineTotal = item.quantity * item.selling_price * (1 - (item.discount_pct || 0) / 100);
                 const isService = item.item_type === 'SERVICE';
@@ -1785,8 +1799,15 @@ export const NewPOS = ({ initialQuotation = null, onQuotationConsumed = null }) 
                             type="number"
                             min="1"
                             max={item.current_stock}
+                            placeholder="1"
                             value={item.quantity}
                             onChange={(e) => handleQuantitySet(idx, e.target.value)}
+                            onBlur={() => {
+                              if (item.quantity === '' || parseInt(item.quantity, 10) < 1) {
+                                handleQuantitySet(idx, '1');
+                              }
+                            }}
+                            onFocus={(e) => e.target.select()}
                             className="w-8 text-center font-bold text-xs bg-transparent focus:outline-none"
                           />
                           <button

@@ -37,7 +37,7 @@ export const AppLayout = ({ children, currentRoute, onNavigate }) => {
         <div
           className={`flex-1 w-full mx-auto ${
             currentRoute === '/pos' || currentRoute === '/pos/new'
-              ? 'p-2 sm:p-2.5 max-w-[1920px] h-[calc(100vh-4rem)] flex flex-col overflow-hidden'
+              ? 'p-2 sm:p-2.5 max-w-[1920px] min-h-[calc(100vh-4rem)] flex flex-col'
               : 'p-4 sm:p-6 lg:p-8 max-w-7xl'
           }`}
         >

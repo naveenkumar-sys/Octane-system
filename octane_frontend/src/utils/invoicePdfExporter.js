@@ -3,6 +3,7 @@ import autoTable from 'jspdf-autotable';
 import octaneLogo from '../assets/octane_logo.png';
 import octaneSeal from '../assets/octane_seal.png';
 import { numberToWordsRupees, formatDateDMY, renderItemSpecsAndSku } from '../components/invoice/A4InvoicePrint';
+import { exportDomToPdf } from './domPdfExporter';
 
 // Format numbers to Indian currency string
 const formatNum = (val) => {
@@ -34,6 +35,21 @@ const loadHtmlImage = (src) => {
 export const downloadInvoicePdf = async (invoice, companyProfile = {}) => {
   if (!invoice) {
     throw new Error('No invoice data provided for PDF generation.');
+  }
+
+  // Attempt pixel-perfect HTML/DOM export first so saved PDF matches print view 100%
+  if (typeof document !== 'undefined') {
+    try {
+      const fileName = await exportDomToPdf({
+        invoice,
+        company: companyProfile,
+        isPurchase: false,
+        copyType: 'ORIGINAL FOR RECIPIENT',
+      });
+      return fileName;
+    } catch (domErr) {
+      console.warn('DOM PDF export failed, falling back to coordinate jsPDF:', domErr);
+    }
   }
 
   const [logoImg, sealImg] = await Promise.all([
@@ -180,20 +196,21 @@ export const downloadInvoicePdf = async (invoice, companyProfile = {}) => {
   let sellerTextX = margin + 2;
   if (logoImg) {
     try {
-      doc.addImage(logoImg, 'PNG', margin + 2, startY + 2, 8, 8);
-      sellerTextX = margin + 11;
+      // 6.0mm x 6.0mm logo perfectly vertically centered with company name text
+      doc.addImage(logoImg, 'PNG', margin + 2, startY + 2.4, 6.0, 6.0);
+      sellerTextX = margin + 10.0;
     } catch {
       // Ignore image render issue
     }
   }
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
-  doc.text(String(company.name || 'OCTANE SYSTEM').toUpperCase(), sellerTextX, startY + 6.5);
+  doc.setFontSize(10.5);
+  doc.text(String(company.name || 'OCTANE SYSTEM').toUpperCase(), sellerTextX, startY + 6.8);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
-  let curY = startY + 11.5;
+  let curY = startY + 11.2;
   doc.text(company.address_line1 || '', margin + 2, curY);
   if (company.address_line2) {
     curY += 3.5;

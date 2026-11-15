@@ -100,13 +100,13 @@ export const QuotationForm = ({ quotationId = null, onNavigateToList, onSaved })
         setFetchingMasters(true);
         const [custRes, prodRes] = await Promise.all([
           api.getCustomers().catch(() => []),
-          api.getProducts().catch(() => []),
+          api.getProducts('?is_active=true').catch(() => api.getProducts().catch(() => [])),
         ]);
 
         const custList = Array.isArray(custRes) ? custRes : (custRes?.results || []);
         const prodList = Array.isArray(prodRes) ? prodRes : (prodRes?.results || []);
         setCustomers(custList);
-        setProducts(prodList);
+        setProducts(prodList.filter((p) => p.is_active !== false));
 
         if (quotationId) {
           // Editing existing quote
