@@ -26,7 +26,8 @@ echo [*] Pulling latest code and features from GitHub...
 git pull
 
 echo.
-echo [*] Rebuilding application containers...
+echo [*] Rebuilding application containers with latest frontend assets...
+docker compose build --no-cache frontend
 docker compose up -d --build
 
 if %errorlevel% neq 0 (
