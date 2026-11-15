@@ -139,7 +139,7 @@ export const A4SinglePageCopy = ({ copyType, invoice, company = {} }) => {
   const documentTitle = invoice.title || (
     isPurchase
       ? (isCancelled ? 'PURCHASE INVOICE (CANCELLED / VOID)' : 'PURCHASE INVOICE')
-      : (isCancelled ? (isNonGst ? 'INVOICE BILL (CANCELLED / VOID)' : 'TAX INVOICE (CANCELLED / VOID)') : (isNonGst ? 'INVOICE BILL' : 'TAX INVOICE'))
+      : (isCancelled ? (isNonGst ? 'INVOICE (CANCELLED / VOID)' : 'TAX INVOICE (CANCELLED / VOID)') : (isNonGst ? 'INVOICE' : 'TAX INVOICE'))
   );
 
   const effectiveCompany = {

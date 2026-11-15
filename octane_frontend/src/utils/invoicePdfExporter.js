@@ -84,8 +84,8 @@ export const downloadInvoicePdf = async (invoice, companyProfile = {}) => {
 
   const docTitle = invoice.title || (
     isCancelled
-      ? (isNonGst ? 'INVOICE BILL (CANCELLED / VOID)' : 'TAX INVOICE (CANCELLED / VOID)')
-      : (isNonGst ? 'INVOICE BILL' : 'TAX INVOICE')
+      ? (isNonGst ? 'INVOICE (CANCELLED / VOID)' : 'TAX INVOICE (CANCELLED / VOID)')
+      : (isNonGst ? 'INVOICE' : 'TAX INVOICE')
   );
 
   const copyType = 'ORIGINAL FOR RECIPIENT';
