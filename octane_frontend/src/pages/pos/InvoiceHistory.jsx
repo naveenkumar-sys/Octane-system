@@ -754,7 +754,7 @@ export const InvoiceHistory = () => {
                           {item.warranty && (
                             <div className="text-[10px] text-blue-700 font-semibold flex items-center gap-1 mt-0.5">
                               <Shield size={10} className="text-blue-600" />
-                              <span>Warranty: {item.warranty}</span>
+                              <span>{String(item.warranty).replace(/^warranty\s*:\s*/i, '').trim()}</span>
                             </div>
                           )}
                         </td>

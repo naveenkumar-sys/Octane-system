@@ -102,7 +102,10 @@ export const renderItemSpecsAndSku = (item) => {
   }
 
   if (item.warranty) {
-    specs.push(`Warranty: ${item.warranty}`);
+    const cleanWarranty = String(item.warranty).replace(/^warranty\s*:\s*/i, '').trim();
+    if (cleanWarranty) {
+      specs.push(cleanWarranty);
+    }
   }
 
   if (item.notes || item.description_extra) {
