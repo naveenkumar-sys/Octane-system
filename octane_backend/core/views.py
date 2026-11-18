@@ -120,6 +120,7 @@ class UserViewSet(viewsets.ModelViewSet):
     """
     queryset = User.objects.all().order_by('-id')
     serializer_class = UserAdminSerializer
+    pagination_class = None
     permission_classes = [IsAdminUser]
 
 
@@ -151,6 +152,7 @@ class CustomerViewSet(viewsets.ModelViewSet):
     """
     queryset = Customer.objects.all()
     serializer_class = CustomerSerializer
+    pagination_class = None
     permission_classes = [IsAdminOrCanCreateCustomer]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['customer_type', 'is_active', 'state_name']
@@ -174,6 +176,7 @@ class SupplierViewSet(viewsets.ModelViewSet):
     """
     queryset = Supplier.objects.all()
     serializer_class = SupplierSerializer
+    pagination_class = None
     permission_classes = [IsAdminOrReadOnly]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['is_active', 'state_name']
@@ -197,6 +200,7 @@ class PartnerViewSet(viewsets.ModelViewSet):
     """
     queryset = Partner.objects.all()
     serializer_class = PartnerSerializer
+    pagination_class = None
     permission_classes = [IsAdminUser]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['is_active']
@@ -225,6 +229,7 @@ class ProductCategoryViewSet(viewsets.ModelViewSet):
     """
     queryset = ProductCategory.objects.all()
     serializer_class = ProductCategorySerializer
+    pagination_class = None
     permission_classes = [IsAdminOrReadOnly]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['is_active']
@@ -247,6 +252,7 @@ class CategoryAttributeViewSet(viewsets.ModelViewSet):
     """
     queryset = CategoryAttribute.objects.select_related('category').all()
     serializer_class = CategoryAttributeSerializer
+    pagination_class = None
     permission_classes = [IsAdminOrReadOnly]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['category', 'attribute_type']
@@ -260,6 +266,7 @@ class BrandViewSet(viewsets.ModelViewSet):
     """
     queryset = Brand.objects.select_related('category').all()
     serializer_class = BrandSerializer
+    pagination_class = None
     permission_classes = [IsAdminOrReadOnly]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['is_active']
@@ -292,6 +299,7 @@ class ProductViewSet(viewsets.ModelViewSet):
     """
     queryset = Product.objects.select_related('category').all()
     serializer_class = ProductSerializer
+    pagination_class = None
     permission_classes = [IsAdminOrReadOnly]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['category', 'tracking_type', 'is_stock_enabled', 'is_active']
@@ -380,6 +388,7 @@ class ServiceCategoryViewSet(viewsets.ModelViewSet):
     """
     queryset = ServiceCategory.objects.all()
     serializer_class = ServiceCategorySerializer
+    pagination_class = None
     permission_classes = [IsAdminOrReadOnly]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['is_active']
@@ -402,6 +411,7 @@ class ServiceViewSet(viewsets.ModelViewSet):
     """
     queryset = Service.objects.select_related('category').all()
     serializer_class = ServiceSerializer
+    pagination_class = None
     permission_classes = [IsAdminOrReadOnly]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['category', 'is_active']
@@ -425,12 +435,18 @@ class SerialNumberViewSet(viewsets.ReadOnlyModelViewSet):
     """
     queryset = SerialNumber.objects.select_related('product').all()
     serializer_class = SerialNumberSerializer
+    pagination_class = None
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['product', 'status']
+    search_fields = ['serial_number', 'product__name', 'product__sku']
     ordering = ['serial_number']
 
     def get_queryset(self):
         qs = super().get_queryset()
+        product_param = self.request.query_params.get('product')
+        if product_param:
+            qs = qs.filter(product_id=product_param)
         status_in = self.request.query_params.get('status__in')
         if status_in:
             statuses = [s.strip() for s in status_in.split(',') if s.strip()]
@@ -470,6 +486,7 @@ class StockMovementViewSet(viewsets.ReadOnlyModelViewSet):
     """
     queryset = StockMovement.objects.select_related('product', 'serial_number', 'created_by').all()
     serializer_class = StockMovementSerializer
+    pagination_class = None
     permission_classes = [IsAdminUser]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['product', 'movement_type', 'reference_type']
@@ -861,6 +878,7 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
     """
     queryset = Payment.objects.select_related('invoice', 'customer', 'created_by').all()
     serializer_class = PaymentSerializer
+    pagination_class = None
     permission_classes = [IsAdminOrCanCreateInvoice]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['invoice', 'customer', 'payment_mode', 'payment_date']
@@ -1217,6 +1235,7 @@ class SupplierPaymentViewSet(viewsets.ReadOnlyModelViewSet):
     """
     queryset = SupplierPayment.objects.select_related('purchase', 'supplier', 'created_by').all()
     serializer_class = SupplierPaymentSerializer
+    pagination_class = None
     permission_classes = [IsAdminUser]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['payment_mode', 'purchase', 'supplier', 'payment_date']
@@ -1231,6 +1250,7 @@ class ExpenseCategoryViewSet(viewsets.ModelViewSet):
     """
     queryset = ExpenseCategory.objects.all()
     serializer_class = ExpenseCategorySerializer
+    pagination_class = None
     permission_classes = [IsAdminUser]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['is_active']
@@ -1253,6 +1273,7 @@ class ExpenseViewSet(viewsets.ModelViewSet):
     """
     queryset = Expense.objects.select_related('category', 'paid_by_partner', 'created_by').all()
     serializer_class = ExpenseSerializer
+    pagination_class = None
     permission_classes = [IsAdminUser]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['category', 'payment_mode', 'paid_by_partner', 'expense_date']
@@ -1271,6 +1292,7 @@ class PartnerDrawingsViewSet(viewsets.ModelViewSet):
     """
     queryset = PartnerDrawings.objects.select_related('partner', 'created_by').all()
     serializer_class = PartnerDrawingsSerializer
+    pagination_class = None
     permission_classes = [IsAdminUser]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['partner', 'payment_mode', 'drawing_date']
@@ -1284,6 +1306,7 @@ class PartnerSettlementViewSet(viewsets.ModelViewSet):
     """
     queryset = PartnerSettlement.objects.select_related('from_partner', 'to_partner', 'created_by').all()
     serializer_class = PartnerSettlementSerializer
+    pagination_class = None
     permission_classes = [IsAdminUser]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['from_partner', 'to_partner', 'payment_mode', 'settlement_date']
@@ -1297,6 +1320,7 @@ class PartnerDepositViewSet(viewsets.ModelViewSet):
     """
     queryset = PartnerDeposit.objects.select_related('partner', 'created_by').all()
     serializer_class = PartnerDepositSerializer
+    pagination_class = None
     permission_classes = [IsAdminUser]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['partner', 'payment_mode', 'deposit_type', 'deposit_date']
